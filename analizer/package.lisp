@@ -1,3 +1,4 @@
 (defpackage mycprof
   (:use :cl :elf :esrap)
-  (:shadowing-import-from :cl :type))
+  (:shadowing-import-from :cl :type)
+  (:export :report))

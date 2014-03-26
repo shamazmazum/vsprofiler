@@ -10,7 +10,7 @@
 (defrule hex-number (and "0" "x" (+ hex-digit))
   (:lambda (list)
     (parse-integer (text (cddr list)) :radix 16)))
-(defrule dec-number (+ dec-digit)
+(defrule dec-number (and (? "-") (+ dec-digit))
   (:lambda (list)
     (parse-integer (text list) :radix 10)))
 (defrule access-type (and (or "-" "r") (or "-" "w") (or "-" "x"))
@@ -25,6 +25,12 @@
 (defrule path (+ (or "-" "." "/" (alphanumericp character)))
   (:function text))
 
+(defun skip-spaces (list)
+  (loop for x in list
+     when (not (equalp x " "))
+     collect x))
+
+#+dragonfly
 (defrule procmap-entry (and hex-number " "
                             hex-number " "
                             dec-number " "
@@ -38,10 +44,25 @@
                             string " "
                             string " "
                             path)
-  (:lambda (list)
-    (loop for x in list
-          when (not (equalp x " "))
-          collect x)))
+  (:function skip-spaces))
+
+#+freebsd
+(defrule procmap-entry (and hex-number " "
+                            hex-number " "
+                            dec-number " "
+                            dec-number " "
+                            hex-number " "
+                            access-type " "
+                            dec-number " "
+                            dec-number " "
+                            hex-number " "
+                            string  " "
+                            string " "
+                            string " "
+                            path " "
+                            string " "
+                            dec-number)
+  (:function skip-spaces))
 
 (defun parse-stream (stream rule)
   (declare (type stream stream))
@@ -49,6 +70,7 @@
         while line
         collect (parse rule line)))
 
+#+(or freebsd dragonfly)
 (defun entry-data (entry)
   (values (nth 0  entry)   ; Start
           (nth 1  entry)   ; End
