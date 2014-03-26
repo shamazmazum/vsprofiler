@@ -25,54 +25,59 @@
 (defrule path (+ (or "-" "." "/" (alphanumericp character)))
   (:function text))
 
+(defstruct (procmap-entry
+             (:constructor make-procmap-entry%))
+  (start 0 :type (integer 0))
+  (end   0 :type (integer 0))
+  access
+  path)
+
 (defun skip-spaces (list)
-  (loop for x in list
-     when (not (equalp x " "))
-     collect x))
+  (remove-if #'(lambda (str) (equal " " str)) list))
+
+#+(or dragonfly freebsd)
+(defun make-procmap-entry (list &aux (wo-spaces (skip-spaces list)))
+  (make-procmap-entry% :start  (nth 0 wo-spaces)
+                       :end    (nth 1 wo-spaces)
+                       :access (nth 5 wo-spaces)
+                       :path   (nth 12 wo-spaces)))
 
 #+dragonfly
-(defrule procmap-entry (and hex-number " "
-                            hex-number " "
-                            dec-number " "
-                            dec-number " "
-                            hex-number " "
-                            access-type " "
-                            dec-number " "
-                            dec-number " "
-                            hex-number " "
-                            string  " "
-                            string " "
-                            string " "
-                            path)
-  (:function skip-spaces))
+(defrule procmap-entry-rule (and hex-number " "
+                                 hex-number " "
+                                 dec-number " "
+                                 dec-number " "
+                                 hex-number " "
+                                 access-type " "
+                                 dec-number " "
+                                 dec-number " "
+                                 hex-number " "
+                                 string  " "
+                                 string " "
+                                 string " "
+                                 path)
+  (:function make-procmap-entry))
 
 #+freebsd
-(defrule procmap-entry (and hex-number " "
-                            hex-number " "
-                            dec-number " "
-                            dec-number " "
-                            hex-number " "
-                            access-type " "
-                            dec-number " "
-                            dec-number " "
-                            hex-number " "
-                            string  " "
-                            string " "
-                            string " "
-                            path " "
-                            string " "
-                            dec-number)
-  (:function skip-spaces))
+(defrule procmap-entry-rule (and hex-number " "
+                                 hex-number " "
+                                 dec-number " "
+                                 dec-number " "
+                                 hex-number " "
+                                 access-type " "
+                                 dec-number " "
+                                 dec-number " "
+                                 hex-number " "
+                                 string  " "
+                                 string " "
+                                 string " "
+                                 path " "
+                                 string " "
+                                 dec-number)
+  (:function make-procmap-entry))
 
 (defun parse-stream (stream rule)
   (declare (type stream stream))
   (loop for line = (read-line stream nil)
         while line
         collect (parse rule line)))
-
-#+(or freebsd dragonfly)
-(defun entry-data (entry)
-  (values (nth 0  entry)   ; Start
-          (nth 1  entry)   ; End
-          (nth 5  entry)   ; Access
-          (nth 12 entry))) ; Path

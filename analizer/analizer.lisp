@@ -4,72 +4,71 @@
 ;; Another way (not implemented here) is to sort and search
 ;; as O(log n)
 
-(defvar *elf-table*)
+(defvar *func-table*)
 
 (defun address-container (procmap address)
   "Find to which object file the address is mapped"
-  (flet ((resides-in-entry-p (entry)
-           (multiple-value-bind (start end)
-               (entry-data entry)
-             (and
-              (>= address start)
-              (< address end)))))
-    (let* ((entries (remove-if-not #'resides-in-entry-p procmap))
-           (entry (first entries)))
-
+  (flet ((resides-in-entry-p (address entry)
+           (and
+            (>= address (procmap-entry-start entry))
+            (<  address (procmap-entry-end entry)))))
+    (let ((entry (find address procmap :test #'resides-in-entry-p)))
       (cond
-        ((= (length entries) 0) nil)
-        ((= (length entries) 1)
-         (multiple-value-bind (start end access path)
-             (entry-data entry)
-           (declare (ignore end))
-           (if (not (member :exec access))
+        (entry
+         (if (not (member :exec (procmap-entry-access entry)))
                (error "Address ~X lays in NX area" address))
-           (values
-            (- address start)
-            path)))
-        (t
-         (error "Overlapped procmap entries for address ~X" address))))))
+         (values
+          (- address (procmap-entry-start entry))
+          (procmap-entry-path entry)))))))
 
-(defun library-p (path)
+#+(or bsd linux)
+(defun libraryp (path)
   (search ".so" path))
 
-(defun address-func (path address dynamicp)
-  (let* ((elf-obj (or (gethash path *elf-table*)
-                      (setf (gethash path *elf-table*)
-                            (read-elf path))))
-         (funcs (get-funcs elf-obj :dynamic dynamicp)))
-    (getf
-     (flet ((address-inside (adr func)
-              (and (>= adr (getf func :start))
-                   (< adr (getf func :end)))))
-       (find address funcs :test #'address-inside))
-     :name)))
+(defun address=>func-name (path address offset)
+  (let* ((libraryp (libraryp path))
+         (funcs (or (gethash path *func-table*)
+                    (setf (gethash path *func-table*)
+                          (get-funcs (read-elf path)
+                                     :dynamic libraryp))))
+         (addr (if libraryp offset address))
+         (func-entry
+          (flet ((address-inside (adr func)
+                   (and (>= adr (function-entry-start func))
+                        (<  adr (function-entry-end func)))))
+            (find (if libraryp offset address) funcs :test #'address-inside))))
+    
+    (if func-entry (function-entry-name func-entry) (format nil "<Unknown function at address ~X>" addr))))
+
+(defstruct report-entry
+  name
+  file
+  count)
+
+(defun report-entry-eql (re1 re2)
+  (and (string= (report-entry-name re1)
+                (report-entry-name re2))
+       (string= (report-entry-file re1)
+                (report-entry-file re2))))
 
 (defun address=>report-entry (procmap address)
   (multiple-value-bind (file-offset path)
       (address-container procmap address)
-    (let* ((dynamicp (library-p path))
-           (funcname (or (address-func
-                          path
-                          (if dynamicp file-offset address)
-                          dynamicp)
-                         "(Unknown function)")))
-      (list :filename path :funcname funcname))))
+    (let ((func-name (address=>func-name path address file-offset)))
+      (make-report-entry :name func-name :file path :count 1))))
 
 (defun report (samples-name procmap-name)
   (let ((samples (with-open-file (in samples-name)
                    (parse-stream in 'hex-number)))
         (procmap (with-open-file (in procmap-name)
-                   (parse-stream in 'procmap-entry)))
-        (*elf-table* (make-hash-table :test #'equal))
+                   (parse-stream in 'procmap-entry-rule)))
+        (*func-table* (make-hash-table :test #'equal))
         report)
     
-    (labels ((cmp-entry (e1 e2) (equal e1 (cdr e2)))
-             (populate-report (address)
-               (let* ((rep-entry (address=>report-entry procmap address))
-                      (rep-entry% (find rep-entry report :test #'cmp-entry)))
-                 (if rep-entry% (incf (car rep-entry%))
-                     (push (cons 1 rep-entry) report)))))
+    (flet ((populate-report (address)
+             (let* ((rep-entry (address=>report-entry procmap address))
+                    (rep-entry% (find rep-entry report :test #'report-entry-eql)))
+               (if rep-entry% (incf (report-entry-count rep-entry%))
+                   (push rep-entry report)))))
       (mapc #'populate-report samples)
       report)))
