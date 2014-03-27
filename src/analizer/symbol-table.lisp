@@ -1,4 +1,4 @@
-(in-package :mycprof)
+(in-package :vsanalizer)
 
 (defun string-at-offset (table offset)
   (let ((end-pos (position 0 table :start offset)))

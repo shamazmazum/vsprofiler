@@ -1,5 +1,5 @@
 ;; Might be OS dependant
-(in-package :mycprof)
+(in-package :vsanalizer)
 
 (defun hex-digit-char-p (char)
   (or (digit-char-p char)

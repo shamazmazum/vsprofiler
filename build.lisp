@@ -6,8 +6,7 @@
         do
         (pushnew os-feature *features*)))
 
-;(require 'asdf)
-(load "~/asdf.lisp")
+(require 'asdf)
 (asdf:load-system :elf)
 (asdf:load-system :esrap)
 
@@ -21,8 +20,8 @@
               #+clisp ext:*args*))
     (cond
       ((= (length args) 2)
-       (print (mycprof:report (nth 0 args)
-                              (nth 1 args)))
+       (print (vsanalizer:report (nth 0 args)
+                                 (nth 1 args)))
        (terpri))
       (t
        (format t "Usage: vsanalizer prof.smpl prof.map~%"))))

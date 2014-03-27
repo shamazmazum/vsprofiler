@@ -1,4 +1,4 @@
-(in-package :mycprof)
+(in-package :vsanalizer)
 
 ;; Find in unsorted map is O(n)
 ;; Another way (not implemented here) is to sort and search
