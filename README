@@ -1,0 +1,47 @@
+VSProfiler (Vasily's statistical profiler) is a simple statistical profiler for Unix-like
+systems (currently FreeBSD and DragonFlyBSD are supported, but is is easy to add support for
+e.g. Linux). Its primary goal is to make it possible to profile programs without
+recompilation.
+
+Its pluses:
+* No need to recompile program to profile (unlike gprof)
+* Supports shared libraries
+* It's simple
+
+Its minuses:
+* No multithreading support
+* Cannot build the call graph, only analizes value of instruction pointer (by now...)
+* Small amount of supported platforms (FreeBSD/DragonFlyBSD on x86-64 machine)
+* Requires Common Lisp implementation for analizer (clisp or sbcl will do) with cl-elf and
+  esrap (sorry, CL is my weakness)
+
+How to build/use:
+
+Run (g)make from this directory. It will build src/runtime/libvsprof.so runtime library and
+src/analizer/vsanalizer program which is analizer tool.
+
+Now you can run your program with the profiler by preloading the library:
+$ LD_PRELOAD=/path/to/libvsprof.so PROF_AUTOSTART=1 program_to_profile
+
+It will create two files: prof.smpl and prof.map in the current working directory. Then run
+vsanalizer with these two files as arguments:
+
+$ /path/to/vsanalizer prof.smpl prof.map
+
+and get something like this:
+
+(#S(VSANALIZER::REPORT-ENTRY
+    :NAME "<Unknown function at address 400534>"
+    :FILE "/home/vasily/mycprofiler/test"
+    :COUNT 7)
+ #S(VSANALIZER::REPORT-ENTRY :NAME "log" :FILE "/lib/libm.so.5" :COUNT 207)
+ #S(VSANALIZER::REPORT-ENTRY
+    :NAME "func"
+    :FILE "/home/vasily/mycprofiler/test"
+    :COUNT 27)
+ #S(VSANALIZER::REPORT-ENTRY
+    :NAME "dich"
+    :FILE "/home/vasily/mycprofiler/test"
+    :COUNT 72))
+
+(I've got this from testingproc.c in this directory)
