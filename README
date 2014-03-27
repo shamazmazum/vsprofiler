@@ -44,4 +44,9 @@ and get something like this:
     :FILE "/home/vasily/mycprofiler/test"
     :COUNT 72))
 
-(I've got this from testingproc.c in this directory)
+(I've got this from testingprog.c in this directory)
+
+
+Another way to use the profiler is to link with libvsprof.so in build time and use
+prof_start() and prof_stop() functions (declared in profiler_lib.h) to start and stop
+profiler explicitly.
