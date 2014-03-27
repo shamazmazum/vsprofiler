@@ -1,3 +1,4 @@
 src/runtime/*.o
 src/runtime/libvsprof.so
-os-name.lisp-expr
+src/analizer/os-name.lisp-expr
+src/analizer/vsanalizer

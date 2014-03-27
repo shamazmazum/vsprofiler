@@ -10,10 +10,10 @@
 (asdf:load-system :elf)
 (asdf:load-system :esrap)
 
-(load "src/analizer/package.lisp")
-(load "src/analizer/procmap-parser.lisp")
-(load "src/analizer/symbol-table.lisp")
-(load "src/analizer/analizer.lisp")
+(load "package.lisp")
+(load "procmap-parser.lisp")
+(load "symbol-table.lisp")
+(load "analizer.lisp")
 
 (defun analizer-impl ()
   (let ((args #+sbcl (cdr sb-ext:*posix-argv*)
