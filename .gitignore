@@ -1,0 +1,3 @@
+src/runtime/*.o
+src/runtime/libvsprof.so
+os-name.lisp-expr
