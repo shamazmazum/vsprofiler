@@ -1,4 +1,4 @@
-;; Might be OS dependant
+;; Might be OS dependent
 (in-package :vsanalizer)
 
 (defun hex-digit-char-p (char)

@@ -16,7 +16,7 @@ elem_t max_samples = 10000;
 suseconds_t sample_interval = 1000; // usec
 int profile_all = 0;
 
-// FIXME: machine dependant
+// FIXME: machine dependent
 static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *context)
 {
     if (elements (samples_vector) < max_samples)
