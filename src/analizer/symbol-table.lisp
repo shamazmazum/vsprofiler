@@ -10,14 +10,14 @@
   name)
 
 (defun get-funcs (elf-obj &key dynamic)
-  (let ((string-table (data (named-section elf-obj
-                                           (if dynamic ".dynstr" ".strtab"))))
-        (func-syms (remove-if-not #'(lambda (sym)
-                                      (eq :func (elf:type sym)))
-                                  (data (named-section elf-obj
-                                                       (if dynamic ".dynsym" ".symtab"))))))
-    (flet ((cons-entry (sym)
-             (make-function-entry :start (value sym)
-                                  :end (+ (value sym) (size sym))
-                                  :name (string-at-offset string-table (name sym)))))
-      (mapcar #'cons-entry func-syms))))
+  (let ((string-table (named-section elf-obj
+                                     (if dynamic ".dynstr" ".strtab")))
+        (symtable (named-section elf-obj
+                                 (if dynamic ".dynsym" ".symtab"))))
+    (if (and string-table
+             symtable)
+        (flet ((cons-entry (sym)
+                 (make-function-entry :start (value sym)
+                                      :end (+ (value sym) (size sym))
+                                      :name (string-at-offset (data string-table) (name sym)))))
+          (mapcar #'cons-entry (data symtable))))))
