@@ -12,4 +12,4 @@ $(TARGET): $(OBJS)
 	$(CC) -Wl,--version-script $(VERSION_SCRIPT) -shared -o $@ $^
 
 clean:
-	rm $(TARGET) *.o
+	rm -f $(TARGET) *.o

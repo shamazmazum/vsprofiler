@@ -11,4 +11,4 @@ src/analizer/vsanalizer:
 clean:
 	$(GNUMAKE) -C src/runtime clean
 	$(GNUMAKE) -C src/analizer clean
-.PHONY: clean
+.PHONY: clean src/analizer/vsanalizer src/runtime/libvsprof.so
