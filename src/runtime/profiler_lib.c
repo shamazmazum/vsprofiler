@@ -16,13 +16,20 @@ elem_t max_samples = 10000;
 suseconds_t sample_interval = 1000; // usec
 int profile_all = 0;
 
+#if defined __x86_64__
+#define IP(ctx) ctx->uc_mcontext.mc_rip
+#elif defined __i386
+#define IP(ctx) ctx->uc_mcontext.mc_eip
+#else
+#error "Unsupported platform"
+#endif
+
 // FIXME: machine dependent
 static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *context)
 {
     if (elements (samples_vector) < max_samples)
     {
-        mcontext_t regs = context->uc_mcontext;
-        size_t rip = regs.mc_rip;
+        size_t rip = IP(context);
         push (samples_vector, &rip);
     }
 }
