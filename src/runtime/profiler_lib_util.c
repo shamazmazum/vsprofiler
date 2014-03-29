@@ -29,7 +29,7 @@ int copy_file (const char *in, const char *out)
         bytes_written = write (fout, buf, bytes_read);
         if (bytes_written != bytes_read) {copy_ok = 0; goto close_out;}
     }
-    while (bytes_read == 0);
+    while (bytes_read != 0);
 
 close_out:
     close (fout);
