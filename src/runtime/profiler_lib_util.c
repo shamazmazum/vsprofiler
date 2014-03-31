@@ -47,7 +47,8 @@ void parse_parameters ()
     {
         entry = *env;
         if (strncmp ("MAX_SAMPLES=", entry, 12) == 0) max_samples = atoi (entry+12);
-        if (strncmp ("SAMPLE_INTERVAL=", entry, 16) == 0) sample_interval = atoi (entry+16);
-        if (strncmp ("PROF_AUTOSTART=", entry, 15) == 0) profile_all = atoi (entry+15);
+        else if (strncmp ("SAMPLE_INTERVAL=", entry, 16) == 0) sample_interval = atoi (entry+16);
+        else if (strncmp ("PROF_AUTOSTART=", entry, 15) == 0) profile_all = atoi (entry+15);
+        else if (strncmp ("PROF_BACKTRACE=", entry, 15) == 0) save_backtrace = atoi (entry+15);
     }
 }

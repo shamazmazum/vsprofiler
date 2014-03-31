@@ -1,4 +1,4 @@
-SRCS = vector.c profiler_lib.c profiler_lib_util.c
+SRCS = squeue.c profiler_lib.c profiler_lib_util.c
 OBJS = $(SRCS:.c=.o)
 TARGET = libvsprof.so
 VERSION_SCRIPT = vsprof.ld
