@@ -10,12 +10,16 @@
 #include "profiler_lib_util.h"
 #include "debug.h"
 
+// Sample queue
 static squeue_t sample_queue_;
 static squeue_t *sample_queue = &sample_queue_;
+// Parameters shadowed by environment variables
 elem_t max_samples = 10000;
 suseconds_t sample_interval = 1000; // usec
-int profile_all = 0;
-int save_backtrace = 0;
+int profile_all = 0; // Start profiling timer implicitly
+int save_backtrace = 0; // Save content of the stack too (experimental)
+// Other
+static int inside_backtrace = 0; // Is control inside function backtrace()?
 
 #if defined __x86_64__
 #define IP(ctx) ctx->uc_mcontext.mc_rip
@@ -33,9 +37,9 @@ int save_backtrace = 0;
 #define MAX_STACK_DEPTH 40
 
 // FIXME: machine dependent
-
 static void backtrace (ucontext_t *context)
 {
+    inside_backtrace = 1;
     smpl_t *bp = (smpl_t*)BP(context);
     int i = 0;
     while (bp && (i < MAX_STACK_DEPTH))
@@ -45,6 +49,21 @@ static void backtrace (ucontext_t *context)
         i++;
     }
     if (i == MAX_STACK_DEPTH) PRINT_DEBUG ("Control stack is too large or unsupported optimizations were used\n");
+    inside_backtrace = 0;
+}
+
+// FIXME: what if running program will replace this handler by its own?
+// Can it be fixed?
+static void sigsegv_signal_handler (int signal)
+{
+    if (inside_backtrace)
+    {
+        printf ("\n--------------------\n");
+        printf ("Segmentation fault while saving backtrace!\n");
+        printf ("This error can mean what your program was build with unsupported optimization\n");
+        printf ("flags (like -fomit-frame-pointer). Try to run profiler without PROF_BACKTRACE\n");
+        printf ("\n--------------------\n");
+    }
 }
 
 static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *context)
@@ -90,16 +109,25 @@ void prof_init ()
     parse_parameters ();
     PRINT_DEBUG ("max_samples=%i, sample_interval=%li, profile_all=%i save_backtrace=%i\n",
                  max_samples, sample_interval, profile_all, save_backtrace);
+    
     PRINT_DEBUG ("Initializing sample queue\n");
     res = squeue_init (sample_queue);
     if (res) abort();
-    PRINT_DEBUG ("Setting interrupt handler\n");
+    
+    PRINT_DEBUG ("Setting interrupt handlers\n");
     struct sigaction sa;
     sa.sa_sigaction = prof_signal_handler;
     sigemptyset (&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
     res = sigaction (SIGPROF, &sa, NULL);
     if (res) abort();
+
+    sa.sa_handler = sigsegv_signal_handler;
+    sa.sa_flags = SA_RESETHAND;
+    sigemptyset (&sa.sa_mask);
+    res = sigaction (SIGSEGV, &sa, NULL);
+    if (res) abort();
+    
     if (profile_all)
     {
         PRINT_DEBUG ("Running timer\n");
