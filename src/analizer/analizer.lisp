@@ -26,25 +26,27 @@
   (multiple-value-bind (reg-start offset path)
       (address-container procmap address)
     (if path
-        (let* ((libraryp (libraryp path))
-               (funcs (or (gethash path func-table)
-                          (setf (gethash path func-table)
-                                (get-funcs (read-elf path)
-                                           :dynamic libraryp))))
-               (addr (if libraryp offset address))
-               (named-function
-                (flet ((address-inside (addr% func)
-                         (and (>= addr% (named-region-start func))
-                              (<  addr% (named-region-end func)))))
-                  (find addr funcs :test #'address-inside))))
+        (multiple-value-bind (funcs were-scanned)
+            (gethash reg-start func-table)
+          (let* ((libraryp (libraryp path))
+                 (funcs (if were-scanned funcs
+                            (setf (gethash reg-start func-table)
+                                  (get-funcs (read-elf path)
+                                             :dynamic libraryp))))
+                 (named-function
+                  (flet ((address-inside (addr% func)
+                           (and (>= addr% (named-region-start func))
+                                (<  addr% (named-region-end func)))))
+                    (find (if libraryp offset address)
+                          funcs :test #'address-inside))))
           
-          (if named-function
-              (return-from address=>func-name
-                (values (+ (if libraryp reg-start 0)
-                           (named-region-start named-function))
-                        (format nil "~A in ~A"
-                                (named-region-name named-function)
-                                path)))))))
+            (if named-function
+                (return-from address=>func-name
+                  (values (+ (if libraryp reg-start 0)
+                             (named-region-start named-function))
+                          (format nil "~A in ~A"
+                                  (named-region-name named-function)
+                                  path))))))))
   (values address
           (format nil "<Unknown function at address ~X>" address)))
 
@@ -59,7 +61,7 @@
 (defun report (samples-name procmap-name)
   (let ((samples (read-samples samples-name))
         (procmap (read-procmap procmap-name))
-        (*func-table* (make-hash-table :test #'equal))
+        (*func-table* (make-hash-table))
         report)
     
     (labels ((populate-report (address &key on-top-p)
