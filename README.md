@@ -7,18 +7,18 @@ possible to profile programs without recompilation.
 
 Its pluses:
 -----------
-    * No need to recompile program to profile (unlike gprof)
-    * Supports shared libraries
-    * It's simple 
+* No need to recompile program to profile (unlike gprof)
+* Supports shared libraries
+* It's simple 
 
 Its minuses:
 ------------
-    * No multithreading support
-    * Cannot build the call graph, only prints flat report (by now...)
-    * Small amount of supported platforms (FreeBSD/DragonFlyBSD on x86/x86-64 machine)
-    * Requires Common Lisp implementation for analizer (clisp or sbcl will do) with cl-elf and esrap 
-      (sorry, CL is my weakness)
-    * Cannot calculate precise number of calls to function (it's very hard in C without recompilation)
+* No multithreading support
+* Cannot build the call graph, only prints flat report (by now...)
+* Small amount of supported platforms (FreeBSD/DragonFlyBSD on x86/x86-64 machine)
+* Requires Common Lisp implementation for analizer (clisp or sbcl will do) with cl-elf and esrap 
+  (sorry, CL is my weakness)
+* Cannot calculate precise number of calls to function (it's very hard in C without recompilation)
 
 UPD: Vorsicht!
 -------------
