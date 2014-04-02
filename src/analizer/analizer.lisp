@@ -31,8 +31,11 @@
   (search ".so" path))
 
 (defun address=>func-name (procmap address &optional (func-table *func-table*))
-  "Accepts a process map PROCMAP and an ADDRESS and returns two values:
-   a begining of the function the ADDRESS belongs to and its name (as a string)"
+  "Accepts a process map PROCMAP and an ADDRESS and returns three values:
+   1) a begining of the function the ADDRESS belongs to (or just the ADDRESS
+   if function is not present in symbol table)
+   2) String representation of the function
+   3) T if function is present in symbol table, NIL otherwise"
   (multiple-value-bind (reg-start path)
       (address-container procmap address)
     (if path
@@ -56,17 +59,20 @@
                              (named-region-start named-function))
                           (format nil "~A in ~A"
                                   (named-region-name named-function)
-                                  path))))))))
+                                  path)
+                          t)))))))
   (values address
-          (format nil "<Unknown function at address ~X>" address)))
+          (format nil "<Unknown function at address ~X>" address)
+          nil))
 
 ;; Flat report without building the call graph is the only
 ;; kind of report currently supported.
 (defstruct report-entry
   "Structure used by reporter to represent a function"
-  (id    0 :type address)
-  (self  0 :type address)
-  (cumul 0 :type address)
+  (id    0   :type address)
+  (self  0   :type address)
+  (cumul 0   :type address)
+  (known nil :type boolean)
   name)
 
 (defun analize (samples-name procmap-name)
@@ -77,7 +83,7 @@
         report)
     
     (labels ((populate-report (address &key on-top-p)
-               (multiple-value-bind (id name)
+               (multiple-value-bind (id name known)
                    (address=>func-name procmap address)
                  (let ((rep-entry (find id report
                                         :test #'(lambda (id rep-entry) (= id (report-entry-id rep-entry))))))
@@ -89,7 +95,8 @@
                       (push (make-report-entry :id id
                                                :self (if on-top-p 1 0)
                                                :cumul 1
-                                               :name name)
+                                               :name name
+                                               :known known)
                             report))))))
              
              (analize-backtrace (backtrace)
@@ -100,16 +107,17 @@
       report)))
 
 (defun report (report &key (sorting-method :self)
-                           (strip-unknown t))
+                           strip-unknown)
   "Prints the report. SORTING-METHOD may be :SELF or :CUMUL
    and determines according to which slot in a report entry
    report will be sorted."
-  (declare (ignore strip-unknown)
-           (type (member :cumul :self) sorting-method))
-  (let ((slot-reader (cond
-                       ((eq :cumul sorting-method) #'report-entry-cumul)
-                       ((eq :self sorting-method) #'report-entry-self))))
-    (flet ((sorting-pred (re1 re2)
-             (> (funcall slot-reader re1)
-                (funcall slot-reader re2))))
-      (sort report #'sorting-pred))))
+  (declare (type (member :cumul :self) sorting-method))
+  (let* ((slot-reader (cond
+                        ((eq :cumul sorting-method) #'report-entry-cumul)
+                        ((eq :self sorting-method) #'report-entry-self)))
+         (report 
+          (flet ((sorting-pred (re1 re2)
+                   (> (funcall slot-reader re1)
+                      (funcall slot-reader re2))))
+            (sort report #'sorting-pred))))
+    (if strip-unknown (remove-if-not #'report-entry-known report) report)))
