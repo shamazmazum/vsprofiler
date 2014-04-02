@@ -1,12 +1,20 @@
 (in-package :vsanalizer)
 
-(defvar *func-table*)
+;; Just in case...
+(defmacro defvar-unbound (var-name &optional documentation)
+  "Helper macro to define unbound variable with documentation"
+  `(progn
+     (defvar ,var-name)
+     ,@(if documentation
+           (list `(setf (documentation ',var-name 'variable) ,documentation)))))
 
-;; Search in unsorted map is O(n)
-;; Another way (not implemented here) is to sort and search
-;; as O(log n)
+(defvar-un *func-table*
+    "Hash table for parsed elf files")
+
 (defun address-container (procmap address)
-  "Find to which object file the address is mapped"
+  "Finds an object file mapped to the address.
+   Also returns a begining of the memory region
+   the file is mapped to as an additional value"
   (flet ((resides-in-entry-p (address entry)
            (and
             (>= address (named-region-start entry))
@@ -15,15 +23,17 @@
       (and entry
            (values
             (named-region-start entry)
-            (- address (named-region-start entry))
             (named-region-name entry))))))
 
 #+(or bsd linux)
 (defun libraryp (path)
+  "Is the filename designates a library?"
   (search ".so" path))
 
 (defun address=>func-name (procmap address &optional (func-table *func-table*))
-  (multiple-value-bind (reg-start offset path)
+  "Accepts a process map PROCMAP and an ADDRESS and returns two values:
+   a begining of the function the ADDRESS belongs to and its name (as a string)"
+  (multiple-value-bind (reg-start path)
       (address-container procmap address)
     (if path
         (multiple-value-bind (funcs were-scanned)
@@ -37,7 +47,7 @@
                   (flet ((address-inside (addr% func)
                            (and (>= addr% (named-region-start func))
                                 (<  addr% (named-region-end func)))))
-                    (find (if libraryp offset address)
+                    (find (if libraryp (- address reg-start) address)
                           funcs :test #'address-inside))))
           
             (if named-function
@@ -53,12 +63,14 @@
 ;; Flat report without building the call graph is the only
 ;; kind of report currently supported.
 (defstruct report-entry
+  "Structure used by reporter to represent a function"
   (id    0 :type address)
   (self  0 :type address)
   (cumul 0 :type address)
   name)
 
 (defun report (samples-name procmap-name)
+  "Processes output of C runtime library and returns a report"
   (let ((samples (read-samples samples-name))
         (procmap (read-procmap procmap-name))
         (*func-table* (make-hash-table))

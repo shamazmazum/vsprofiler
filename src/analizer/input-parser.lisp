@@ -27,6 +27,7 @@
 
 (deftype address () '(integer 0))
 (defstruct named-region
+  "Specifies named memory region (such as function or mapped file)"
   (start 0 :type address)
   (end   0 :type address)
   name)
@@ -82,12 +83,14 @@
     (mapcar #'first (car (butlast list)))))
 
 (defun parse-stream (stream rule)
+  "Parse an input stream line-by-line, applying the rule"
   (declare (type stream stream))
   (loop for line = (read-line stream nil)
         while line
         collect (parse rule line)))
 
 (defun read-procmap (procmap-name)
+  "Parse procmap file with the name PROCMAP-NAME"
   (with-open-file (in procmap-name)
     (flet ((executablep (entry)
              (find :exec (car entry))))
@@ -96,5 +99,6 @@
                              (parse-stream in 'procmap-entry-rule))))))
 
 (defun read-samples (samples-name)
+  "Parse file of samples with the name SAMPLES-NAME"
   (with-open-file (in samples-name)
     (parse-stream in 'sample-rule)))
