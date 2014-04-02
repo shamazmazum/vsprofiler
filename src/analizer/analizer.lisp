@@ -69,7 +69,7 @@
   (cumul 0 :type address)
   name)
 
-(defun report (samples-name procmap-name)
+(defun analize (samples-name procmap-name)
   "Processes output of C runtime library and returns a report"
   (let ((samples (read-samples samples-name))
         (procmap (read-procmap procmap-name))
@@ -98,3 +98,18 @@
 
       (mapc #'analize-backtrace samples)
       report)))
+
+(defun report (report &key (sorting-method :self)
+                           (strip-unknown t))
+  "Prints the report. SORTING-METHOD may be :SELF or :CUMUL
+   and determines according to which slot in a report entry
+   report will be sorted."
+  (declare (ignore strip-unknown)
+           (type (member :cumul :self) sorting-method))
+  (let ((slot-reader (cond
+                       ((eq :cumul sorting-method) #'report-entry-cumul)
+                       ((eq :self sorting-method) #'report-entry-self))))
+    (flet ((sorting-pred (re1 re2)
+             (> (funcall slot-reader re1)
+                (funcall slot-reader re2))))
+      (sort report #'sorting-pred))))
