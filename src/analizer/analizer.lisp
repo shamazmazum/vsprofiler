@@ -8,7 +8,7 @@
      ,@(if documentation
            (list `(setf (documentation ',var-name 'variable) ,documentation)))))
 
-(defvar-un *func-table*
+(defvar-unbound *func-table*
     "Hash table for parsed elf files")
 
 (defun address-container (procmap address)
@@ -42,7 +42,7 @@
                  (funcs (if were-scanned funcs
                             (setf (gethash reg-start func-table)
                                   (get-funcs (read-elf path)
-                                             :dynamic libraryp))))
+                                             :dynamicp libraryp))))
                  (named-function
                   (flet ((address-inside (addr% func)
                            (and (>= addr% (named-region-start func))
