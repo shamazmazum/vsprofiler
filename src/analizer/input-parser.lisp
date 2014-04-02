@@ -25,22 +25,22 @@
 (defrule path (+ (or "-" "." "/" (alphanumericp character)))
   (:function text))
 
-(defstruct (procmap-entry
-             (:constructor make-procmap-entry%))
-  (start 0 :type (integer 0))
-  (end   0 :type (integer 0))
-  access
-  path)
+(deftype address () '(integer 0))
+(defstruct named-region
+  (start 0 :type address)
+  (end   0 :type address)
+  name)
 
 (defun skip-spaces (list)
   (remove-if #'(lambda (str) (equal " " str)) list))
 
 #+(or dragonfly freebsd)
-(defun make-procmap-entry (list &aux (wo-spaces (skip-spaces list)))
-  (make-procmap-entry% :start  (nth 0 wo-spaces)
-                       :end    (nth 1 wo-spaces)
-                       :access (nth 5 wo-spaces)
-                       :path   (nth 12 wo-spaces)))
+(defun make-procmap-entry (list &aux (w/o-spaces (skip-spaces list)))
+  (cons
+   (nth 5 w/o-spaces)
+   (make-named-region :start  (nth 0  w/o-spaces)
+                      :end    (nth 1  w/o-spaces)
+                      :name   (nth 12 w/o-spaces))))
 
 #+dragonfly
 (defrule procmap-entry-rule (and hex-number " "
@@ -76,8 +76,25 @@
                                  dec-number)
   (:function make-procmap-entry))
 
+;; FIXME: 0x0 here must correspond with SAMPLE_TERM in C code
+(defrule sample-rule (and (* (and hex-number " ")) "0x0")
+  (:lambda (list)
+    (mapcar #'first (car (butlast list)))))
+
 (defun parse-stream (stream rule)
   (declare (type stream stream))
   (loop for line = (read-line stream nil)
         while line
         collect (parse rule line)))
+
+(defun read-procmap (procmap-name)
+  (with-open-file (in procmap-name)
+    (flet ((executablep (entry)
+             (find :exec (car entry))))
+      (mapcar #'cdr
+              (remove-if-not #'executablep
+                             (parse-stream in 'procmap-entry-rule))))))
+
+(defun read-samples (samples-name)
+  (with-open-file (in samples-name)
+    (parse-stream in 'sample-rule)))

@@ -1,6 +1,6 @@
 LISP_IMPL= sbcl --script
 #LISP_IMPL= clisp
-SRC = package.lisp analizer.lisp procmap-parser.lisp symbol-table.lisp
+SRC = package.lisp analizer.lisp input-parser.lisp symbol-table.lisp
 
 all: vsanalizer
 

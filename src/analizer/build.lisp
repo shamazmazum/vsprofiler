@@ -11,9 +11,9 @@
 (asdf:load-system :esrap)
 
 (load "package.lisp")
-(load "procmap-parser.lisp")
-(load "symbol-table.lisp")
-(load "analizer.lisp")
+(load "input-parser.lisp")
+(load "symbol-table.lisp") ; Depends on named-region
+(load "analizer.lisp") ; Must be the last
 
 (defun analizer-impl ()
   (let ((args #+sbcl (cdr sb-ext:*posix-argv*)

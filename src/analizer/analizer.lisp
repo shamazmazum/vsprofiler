@@ -1,77 +1,86 @@
 (in-package :vsanalizer)
 
-;; Find in unsorted map is O(n)
-;; Another way (not implemented here) is to sort and search
-;; as O(log n)
-
 (defvar *func-table*)
 
+;; Search in unsorted map is O(n)
+;; Another way (not implemented here) is to sort and search
+;; as O(log n)
 (defun address-container (procmap address)
   "Find to which object file the address is mapped"
   (flet ((resides-in-entry-p (address entry)
            (and
-            (>= address (procmap-entry-start entry))
-            (<  address (procmap-entry-end entry)))))
+            (>= address (named-region-start entry))
+            (<  address (named-region-end entry)))))
     (let ((entry (find address procmap :test #'resides-in-entry-p)))
-      (cond
-        (entry
-         (if (not (member :exec (procmap-entry-access entry)))
-               (error "Address ~X lays in NX area" address))
-         (values
-          (- address (procmap-entry-start entry))
-          (procmap-entry-path entry)))))))
+      (and entry
+           (values
+            (named-region-start entry)
+            (- address (named-region-start entry))
+            (named-region-name entry))))))
 
 #+(or bsd linux)
 (defun libraryp (path)
   (search ".so" path))
 
-(defun address=>func-name (path address offset)
-  (let* ((libraryp (libraryp path))
-         (funcs (or (gethash path *func-table*)
-                    (setf (gethash path *func-table*)
-                          (get-funcs (read-elf path)
-                                     :dynamic libraryp))))
-         (addr (if libraryp offset address))
-         (func-entry
-          (flet ((address-inside (adr func)
-                   (and (>= adr (function-entry-start func))
-                        (<  adr (function-entry-end func)))))
-            (find (if libraryp offset address) funcs :test #'address-inside))))
-    
-    (if func-entry (function-entry-name func-entry) (format nil "<Unknown function at address ~X>" addr))))
-
-(defstruct report-entry
-  name
-  file
-  count)
-
-(defun report-entry-eql (re1 re2)
-  (and (string= (report-entry-name re1)
-                (report-entry-name re2))
-       (string= (report-entry-file re1)
-                (report-entry-file re2))))
-
-(defun address=>report-entry (procmap address)
-  (multiple-value-bind (file-offset path)
+(defun address=>func-name (procmap address &optional (func-table *func-table*))
+  (multiple-value-bind (reg-start offset path)
       (address-container procmap address)
-    (let ((func-name (address=>func-name path address file-offset)))
-      (make-report-entry :name func-name :file path :count 1))))
+    (if path
+        (let* ((libraryp (libraryp path))
+               (funcs (or (gethash path func-table)
+                          (setf (gethash path func-table)
+                                (get-funcs (read-elf path)
+                                           :dynamic libraryp))))
+               (addr (if libraryp offset address))
+               (named-function
+                (flet ((address-inside (addr% func)
+                         (and (>= addr% (named-region-start func))
+                              (<  addr% (named-region-end func)))))
+                  (find addr funcs :test #'address-inside))))
+          
+          (if named-function
+              (return-from address=>func-name
+                (values (+ (if libraryp reg-start 0)
+                           (named-region-start named-function))
+                        (format nil "~A in ~A"
+                                (named-region-name named-function)
+                                path)))))))
+  (values address
+          (format nil "<Unknown function at address ~X>" address)))
+
+;; Flat report without building the call graph is the only
+;; kind of report currently supported.
+(defstruct report-entry
+  (id    0 :type address)
+  (self  0 :type address)
+  (cumul 0 :type address)
+  name)
 
 (defun report (samples-name procmap-name)
-  (let ((samples (with-open-file (in samples-name)
-                   (parse-stream in 'hex-number)))
-        (procmap (with-open-file (in procmap-name)
-                   (parse-stream in 'procmap-entry-rule)))
+  (let ((samples (read-samples samples-name))
+        (procmap (read-procmap procmap-name))
         (*func-table* (make-hash-table :test #'equal))
         report)
     
-    (flet ((populate-report (address)
-             (let* ((rep-entry (address=>report-entry procmap address))
-                    (rep-entry% (find rep-entry report :test #'report-entry-eql)))
-               (if rep-entry% (incf (report-entry-count rep-entry%))
-                   (push rep-entry report))))
-           (report-entry-> (re1 re2)
-             (> (report-entry-count re1)
-                (report-entry-count re2))))
-      (mapc #'populate-report samples)
-      (sort report #'report-entry->))))
+    (labels ((populate-report (address &key on-top-p)
+               (multiple-value-bind (id name)
+                   (address=>func-name procmap address)
+                 (let ((rep-entry (find id report
+                                        :test #'(lambda (id rep-entry) (= id (report-entry-id rep-entry))))))
+                   (cond
+                     (rep-entry
+                      (incf (report-entry-cumul rep-entry))
+                      (if on-top-p (incf (report-entry-self rep-entry))))
+                     (t
+                      (push (make-report-entry :id id
+                                               :self (if on-top-p 1 0)
+                                               :cumul 1
+                                               :name name)
+                            report))))))
+             
+             (analize-backtrace (backtrace)
+               (populate-report (car backtrace) :on-top-p t)
+               (mapc #'populate-report (cdr backtrace))))
+
+      (mapc #'analize-backtrace samples)
+      report)))
