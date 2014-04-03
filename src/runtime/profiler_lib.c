@@ -143,7 +143,7 @@ static int save_samples (FILE *out)
     {
         if (squeue_pop_entry (sample_queue, &ip))
             PRINT_ERROR ("Cannot get value from queue %p\n", sample_queue);
-        fprintf (out, "%p%c", (void*)ip, (ip == SAMPLE_TERM) ? '\n' : ' ');
+        fprintf (out, "0x%lx%c", ip, (ip == SAMPLE_TERM) ? '\n' : ' ');
     }
     return 0;
 }
