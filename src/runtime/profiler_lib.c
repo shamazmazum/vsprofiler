@@ -21,6 +21,10 @@ int save_backtrace = 0; // Save content of the stack too (experimental)
 // Other
 static int inside_backtrace = 0; // Is control inside function backtrace()?
 
+#if !defined(__FreeBSD__) && !defined(__DragonFly__)
+#error "Unsupported platform"
+#endif
+
 #if defined __x86_64__
 #define IP(ctx) ctx->uc_mcontext.mc_rip
 #define BP(ctx) ctx->uc_mcontext.mc_rbp
