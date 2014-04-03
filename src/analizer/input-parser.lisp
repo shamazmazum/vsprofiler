@@ -60,24 +60,24 @@
                        :access (nth 5  w/o-spaces)))
 
 #+bsd
-(defrule procmap-entry-rule (and hex-number " "
-                                 hex-number " "
-                                 dec-number " "
-                                 dec-number " "
-                                 (or hex-number
-                                     dec-number) " "
-                                 access-type " "
-                                 dec-number " "
-                                 dec-number " "
-                                 hex-number " "
-                                 copy-on-write  " "
-                                 needs-copy " "
-                                 obj-type " "
-                                 path " "
-                                 #+freebsd cred
-                                 #+freebsd " "
-                                 #+freebsd dec-number)
-  (:function make-procmap-entry))
+(defrule procmap-entry-rule #.`(and hex-number " "
+                                    hex-number " "
+                                    dec-number " "
+                                    dec-number " "
+                                    (or hex-number
+                                        dec-number) " "
+                                    access-type " "
+                                    dec-number " "
+                                    dec-number " "
+                                    hex-number " "
+                                    copy-on-write  " "
+                                    needs-copy " "
+                                    obj-type " "
+                                    path
+                                    #+freebsd
+                                    ,@'(" " cred
+                                        " " dec-number))
+         (:function make-procmap-entry))
 
 ;; FIXME: 0x0 here must correspond with SAMPLE_TERM in C code
 (defrule sample-rule (and (* (and hex-number " ")) "0x0")
