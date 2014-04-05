@@ -34,36 +34,39 @@
   "Accepts a process map PROCMAP and an ADDRESS and returns three values:
    1) a begining of the function the ADDRESS belongs to (or just the ADDRESS
    if function is not present in symbol table)
-   2) String representation of the function
-   3) T if function is present in symbol table, NIL otherwise"
-  (multiple-value-bind (reg-start path)
-      (address-container procmap address)
-    (if path
-        (multiple-value-bind (funcs were-scanned)
-            (gethash reg-start func-table)
-          (let* ((libraryp (libraryp path))
-                 (funcs (if were-scanned funcs
-                            (setf (gethash reg-start func-table)
-                                  (get-funcs (read-elf path)
-                                             :dynamicp libraryp))))
-                 (named-function
-                  (flet ((address-inside (addr% func)
-                           (and (>= addr% (named-region-start func))
-                                (<  addr% (named-region-end func)))))
-                    (find (if libraryp (- address reg-start) address)
-                          funcs :test #'address-inside))))
-          
-            (if named-function
-                (return-from address=>func-name
-                  (values (+ (if libraryp reg-start 0)
-                             (named-region-start named-function))
-                          (format nil "~A in ~A"
-                                  (named-region-name named-function)
-                                  path)
-                          t)))))))
-  (values address
-          (format nil "<Unknown function at address ~X>" address)
-          nil))
+   2) name of the function
+   3) name of an object file which contains the function
+   4) T if function is present in symbol table, NIL otherwise"
+  (let ((fn-start address)
+        (fn-name "<Unknown function>")
+        fn-obj known)
+    (multiple-value-bind (reg-start path)
+        (address-container procmap address)
+      (cond
+        (path
+         (setq fn-obj path)
+         (multiple-value-bind (funcs were-scanned)
+             (gethash reg-start func-table)
+           (let* ((libraryp (libraryp path))
+                  (funcs (if were-scanned funcs
+                             (setf (gethash reg-start func-table)
+                                   (get-funcs (read-elf path)
+                                              :dynamicp libraryp))))
+                  (named-function
+                   (flet ((address-inside (addr% func)
+                            (and (>= addr% (named-region-start func))
+                                 (<  addr% (named-region-end func)))))
+                     (find (if libraryp (- address reg-start) address)
+                           funcs :test #'address-inside))))
+             
+             (if named-function (setq known t
+                                      fn-start (+ (if libraryp reg-start 0)
+                                                  (named-region-start named-function))
+                                      fn-name (named-region-name named-function))))))))
+    (values fn-start
+            fn-name
+            fn-obj
+            known)))
 
 ;; Flat report without building the call graph is the only
 ;; kind of report currently supported.
@@ -73,7 +76,8 @@
   (self  0   :type address)
   (cumul 0   :type address)
   (known nil :type boolean)
-  name)
+  fn-name
+  obj-name)
 
 (defun analize (samples-name procmap-name)
   "Processes output of C runtime library and returns a report"
@@ -83,7 +87,7 @@
         report)
     
     (labels ((populate-report (address &key on-top-p)
-               (multiple-value-bind (id name known)
+               (multiple-value-bind (id fn-name obj-name known)
                    (address=>func-name procmap address)
                  (let ((rep-entry (find id report
                                         :test #'(lambda (id rep-entry) (= id (report-entry-id rep-entry))))))
@@ -95,7 +99,8 @@
                       (push (make-report-entry :id id
                                                :self (if on-top-p 1 0)
                                                :cumul 1
-                                               :name name
+                                               :fn-name fn-name
+                                               :obj-name obj-name
                                                :known known)
                             report))))))
              
