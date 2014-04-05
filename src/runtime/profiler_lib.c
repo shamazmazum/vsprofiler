@@ -110,13 +110,13 @@ static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *contex
 {
     if (squeue_samples (sample_queue) < max_samples)
     {
-        smpl_t ip = IP(context);
-        PUSH_DEBUG (sample_queue, ip);
         if (save_backtrace)
         {
             restore_frame_if_needed (context);
+            PUSH_DEBUG (sample_queue, IP(context));
             backtrace (context);
         }
+        else PUSH_DEBUG (sample_queue, IP(context));
         if (squeue_finalize_sample (sample_queue))
             PRINT_ERROR ("Cannot finalize sample in queue %p\n", sample_queue);
     }
