@@ -20,6 +20,7 @@ int profile_all = 0; // Start profiling timer implicitly
 int save_backtrace = 0; // Save content of the stack too (experimental)
 // Other
 static int inside_backtrace = 0; // Is control inside function backtrace()?
+static int frames_restored = 0; // Number of restored stack frames
 
 #if !defined(__FreeBSD__) && !defined(__DragonFly__)
 #error "Unsupported platform"
@@ -28,9 +29,11 @@ static int inside_backtrace = 0; // Is control inside function backtrace()?
 #if defined __x86_64__
 #define IP(ctx) ctx->uc_mcontext.mc_rip
 #define BP(ctx) ctx->uc_mcontext.mc_rbp
+#define SP(ctx) ctx->uc_mcontext.mc_rsp
 #elif defined __i386
 #define IP(ctx) ctx->uc_mcontext.mc_eip
 #define BP(ctx) ctx->uc_mcontext.mc_ebp
+#define SP(ctx) ctx->uc_mcontext.mc_esp
 #else
 #error "Unsupported platform"
 #endif
@@ -56,6 +59,39 @@ static void backtrace (ucontext_t *context)
     inside_backtrace = 0;
 }
 
+static void restore_frame_if_needed (ucontext_t *context)
+{
+    // Fix the situations where we've just entered in a new function and
+    // the stack frame was not properly created (or we are ready to leave
+    // and the frame is already destroyed)
+    // Works just for x86/x86-64, of course.
+    unsigned char *ip = (void*)IP(context);
+    
+    // KLUDGE: There can be other instructions between push %rbp and mov %rsp,%rbp
+    // But this type of prologue is the most common.
+    
+    // Not really restores frame pointer. Works together with the next case
+    if (*ip == 0x55) /* push %rbp */
+    {
+        IP(context)++;
+        ip = (void*)IP(context);
+        SP(context) -= sizeof(smpl_t);
+        *((smpl_t*)SP(context)) = BP(context);
+    }
+    if ((*ip == 0x48) && (*(ip+1) == 0x89) && (*(ip+2) == 0xe5)) /* mov %rsp,%rbp */
+    {
+        IP(context) += 3;
+        BP(context) = SP(context);
+        frames_restored++;
+    }
+    else if (*ip == 0xc3) /* retq */
+    {
+        IP(context) = *((smpl_t*)SP(context));
+        SP(context) += sizeof(smpl_t);
+        frames_restored++;
+    }
+}
+
 // FIXME: what if running program will replace this handler by its own?
 // Can it be fixed?
 static void sigsegv_signal_handler (int signal)
@@ -76,7 +112,11 @@ static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *contex
     {
         smpl_t ip = IP(context);
         PUSH_DEBUG (sample_queue, ip);
-        if (save_backtrace) backtrace (context);
+        if (save_backtrace)
+        {
+            restore_frame_if_needed (context);
+            backtrace (context);
+        }
         if (squeue_finalize_sample (sample_queue))
             PRINT_ERROR ("Cannot finalize sample in queue %p\n", sample_queue);
     }
@@ -171,4 +211,6 @@ void prof_end ()
 
     PRINT_DEBUG ("Freeing sample queue\n");
     squeue_free (sample_queue);
+
+    PRINT_DEBUG ("%i stack frames was restored during execution\n", frames_restored);
 }
