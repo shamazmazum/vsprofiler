@@ -17,9 +17,9 @@ $(TARGET): $(OBJS)
 	$(CC) $(LFLAGS) -shared -o $@ $^
 
 tests: $(OBJS) tests.c 
-	$(CC) $(CFLAGS) $(CUNIT_LIB) $(CUNIT_INCLUDE) -o $@ $^
+	$(CC) $(CUNIT_LIB) $(CUNIT_INCLUDE) -o $@ $^
 example: example.c
-	$(CC) $(CFLAGS) -lm -o $@ $^
+	$(CC) -lm -o $@ $^
 
 clean:
 	rm -f $(TARGET) *.o tests example prof.map prof.smpl

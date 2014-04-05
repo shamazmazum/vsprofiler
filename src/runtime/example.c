@@ -1,47 +1,51 @@
+#include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
-#include <float.h>
-#include <math.h>
-#define MAX_STEPS 10000000
 
-float func (float x)
+#define SIZE 100000000
+// From http://ru.wikibooks.org/wiki/Программные_реализации_вычисления_CRC
+/*
+  Name  : CRC-8
+  Poly  : 0x31    x^8 + x^5 + x^4 + 1
+  Init  : 0xFF
+  Revert: false
+  XorOut: 0x00
+*/
+
+uint8_t crc8(uint8_t *buf, ssize_t len)
 {
-    return log(x);
-}
-
-float dich (float start, float end, float (*func) (float), int *step)
-{
-    float start2, end2;
-    float f1 = func (start);
-    float f2 = func (end);
-
-    float middle = (end-start)/2 + start;
-    float fm = func (middle);
-
-    if ((*step == MAX_STEPS) || (fabs(fm) <= FLT_EPSILON)) return middle;
-
-    if (f1*fm > 0)
-    {
-        start2 = middle;
-        end2 = end;
-    }
-    else
-    {
-        start2 = start;
-        end2 = middle;
-    }
-    (*step)++;
-    return dich (start2, end2, func, step);
-}
-
-int main()
-{
-    int step = 0;
+    uint8_t crc = 0xFF;
     int i;
-    float res;
-    for (i=0; i<100000; i++)
+ 
+    while (len--)
     {
-        res = dich (0.001, i+1000.0, func, &step);
+        crc ^= *buf++;
+        for (i = 0; i < 8; i++)
+            crc = crc & 0x80 ? (crc << 1) ^ 0x31 : crc << 1;
     }
-    printf ("%f, %i\n", res, step);
+    return crc;
+}
+
+long factor (long n)
+{
+    int res = 1;
+    int i;
+    for (i=1; i<n; i++) res = res*i;
+    return res;
+}
+
+uint8_t get_value(long idx)
+{
+    return factor(idx & 0x0f) & 0xff;
+}
+
+int main ()
+{
+    uint8_t *buf = malloc (SIZE);
+    long i;
+    for (i=0; i<SIZE; i++) buf[i] = get_value(i);
+    uint8_t crc = crc8 (buf, SIZE);
+    free (buf);
+    printf ("0x%02x\n", crc);
     return 0;
 }
