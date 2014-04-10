@@ -10,6 +10,10 @@
 (defrule hex-number (and "0" "x" (+ hex-digit))
   (:lambda (list)
     (parse-integer (text (cddr list)) :radix 16)))
+#+netbsd
+(defrule hex-number2  (+ hex-digit)
+  (:lambda (list)
+    (parse-integer (text  list) :radix 16)))
 (defrule dec-number (and (? "-") (+ dec-digit))
   (:lambda (list)
     (parse-integer (text list) :radix 10)))
@@ -21,7 +25,11 @@
                   (if (string/= "-" write) (push :write access))
                   (if (string/= "-" exec) (push :exec access))
                   access)))
+
+#+(or freebsd dragonfly)
 (defrule copy-on-write (or "COW" "NCOW"))
+#+netbsd
+(defrule copy-on-write (or "p" "s"))
 (defrule needs-copy (or "NC" "NNC"))
 (defrule cred (or "CH" "NCH"))
 #+freebsd
@@ -52,14 +60,20 @@
   "Actually this is a named region with access rules"
   (access nil :type list))
 
-#+bsd
+#+(or freebsd dragonfly)
 (defun make-procmap-entry (list &aux (w/o-spaces (skip-spaces list)))
   (make-procmap-entry% :start  (nth 0  w/o-spaces)
                        :end    (nth 1  w/o-spaces)
                        :name   (nth 12 w/o-spaces)
                        :access (nth 5  w/o-spaces)))
+#+netbsd
+(defun make-procmap-entry (list &aux (w/o-spaces (skip-spaces list)))
+  (make-procmap-entry% :start  (nth 0  w/o-spaces)
+                       :end    (nth 2  w/o-spaces)
+                       :name   (nth 11 w/o-spaces)
+                       :access (nth 3  w/o-spaces)))
 
-#+bsd
+#+(or freebsd dragonfly)
 (defrule procmap-entry-rule #.`(and hex-number " "
                                     hex-number " "
                                     dec-number " "
@@ -78,6 +92,16 @@
                                     ,@'(" " cred
                                         " " dec-number))
          (:function make-procmap-entry))
+
+;; NetBSD without linux mode
+#+netbsd
+(defrule procmap-entry-rule (and hex-number "-" hex-number " "
+                                 access-type
+                                 copy-on-write " "
+                                 hex-number2 " "
+                                 hex-number2 ":" hex-number2 " "
+                                 dec-number (+ " ") (? path))
+  (:function make-procmap-entry))
 
 ;; FIXME: 0x0 here must correspond with SAMPLE_TERM in C code
 (defrule sample-rule (and (* (and hex-number " ")) "0x0")

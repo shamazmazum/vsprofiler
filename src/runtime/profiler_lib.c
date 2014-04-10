@@ -22,20 +22,38 @@ int save_backtrace = 0; // Save content of the stack too (experimental)
 static int inside_backtrace = 0; // Is control inside function backtrace()?
 static int frames_restored = 0; // Number of restored stack frames
 
-#if !defined(__FreeBSD__) && !defined(__DragonFly__)
-#error "Unsupported platform"
-#endif
-
+#if defined(__DragonFly__) || defined(__FreeBSD__)
+#define PROCMAP "/proc/curproc/map"
 #if defined __x86_64__
 #define IP(ctx) ctx->uc_mcontext.mc_rip
 #define BP(ctx) ctx->uc_mcontext.mc_rbp
 #define SP(ctx) ctx->uc_mcontext.mc_rsp
+#define SUPPORTED_PLATFORM
 #elif defined __i386
 #define IP(ctx) ctx->uc_mcontext.mc_eip
 #define BP(ctx) ctx->uc_mcontext.mc_ebp
 #define SP(ctx) ctx->uc_mcontext.mc_esp
-#else
+#define SUPPORTED_PLATFORM
+#endif // arch
+#elif defined(__NetBSD__)
+#define PROCMAP "/proc/curproc/maps"
+#if defined __x86_64__
+#define IP(ctx) ctx->uc_mcontext.__gregs[_REG_RIP]
+#define BP(ctx) ctx->uc_mcontext.__gregs[_REG_RBP]
+#define SP(ctx) ctx->uc_mcontext.__gregs[_REG_RSP]
+#define SUPPORTED_PLATFORM
+#elif defined __i386
+#define IP(ctx) ctx->uc_mcontext.__gregs[_REG_EIP]
+#define BP(ctx) ctx->uc_mcontext.__gregs[_REG_EBP]
+#define SP(ctx) ctx->uc_mcontext.__gregs[_REG_ESP]
+#define SUPPORTED_PLATFORM
+#endif // arch
+#endif // os
+
+#ifndef SUPPORTED_PLATFORM
 #error "Unsupported platform"
+#else
+#undef SUPPORTED_PLATFORM
 #endif
 
 #define PUSH_DEBUG(queue,val) if (squeue_push_entry (queue, val)) \
@@ -206,7 +224,7 @@ void prof_end ()
     if (op_res) PRINT_ERROR ("Cannot write sample file\n");
 
     PRINT_DEBUG ("Saving process map\n");
-    op_res = copy_file ("/proc/curproc/map", "prof.map");
+    op_res = copy_file (PROCMAP, "prof.map");
     if (op_res) PRINT_ERROR ("Cannot write map file\n");
 
     PRINT_DEBUG ("Freeing sample queue\n");

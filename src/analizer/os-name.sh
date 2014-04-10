@@ -14,6 +14,10 @@ case `uname` in
         echo ":dragonfly" >  os-name.lisp-expr
         echo ":bsd" >>  os-name.lisp-expr
         ;;
+    NetBSD)
+        echo ":netbsd" >  os-name.lisp-expr
+        echo ":bsd" >>  os-name.lisp-expr
+        ;;
     *)
         echo unsupported OS type: `uname`
         exit 1
