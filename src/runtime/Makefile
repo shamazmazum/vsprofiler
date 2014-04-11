@@ -6,7 +6,7 @@ CFLAGS = -DWITH_DEBUG -O2
 LFLAGS = -Wl,--version-script vsprof.ld
 
 CUNIT_INCLUDE = -I/usr/local/include
-CUNIT_LIB = -L/usr/local/lib -lcunit
+CUNIT_LIB = -L/usr/local/lib -lcunit -lncurses
 
 all: $(TARGET)
 
