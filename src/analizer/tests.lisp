@@ -6,8 +6,8 @@
 
 (defun find-with-name (name report)
   (find name report
-        :test #'(lambda (name re)
-                  (string= name (report-entry-fn-name re)))))
+        :test #'string=
+        :key  #'report-entry-fn-name))
 
 (defun test-tree (rep tree)
   (if tree

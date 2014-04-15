@@ -11,19 +11,21 @@
 (defvar-unbound *func-table*
     "Hash table for parsed elf files")
 
+(defun address-inside-p (address region)
+  (declare (type named-region region))
+  (and
+   (>= address (named-region-start region))
+   (<  address (named-region-end   region))))
+
 (defun address-container (procmap address)
   "Finds an object file mapped to the address.
    Also returns a begining of the memory region
    the file is mapped to as an additional value"
-  (flet ((resides-in-entry-p (address entry)
-           (and
-            (>= address (named-region-start entry))
-            (<  address (named-region-end entry)))))
-    (let ((entry (find address procmap :test #'resides-in-entry-p)))
-      (and entry
-           (values
-            (named-region-start entry)
-            (named-region-name entry))))))
+  (let ((entry (find address procmap :test #'address-inside-p)))
+    (and entry
+         (values
+          (named-region-start entry)
+          (named-region-name entry)))))
 
 #+(or bsd linux)
 (defun libraryp (path)
@@ -53,11 +55,8 @@
                                    (get-funcs (read-elf path)
                                               :dynamicp libraryp))))
                   (named-function
-                   (flet ((address-inside (addr% func)
-                            (and (>= addr% (named-region-start func))
-                                 (<  addr% (named-region-end func)))))
-                     (find (if libraryp (- address reg-start) address)
-                           funcs :test #'address-inside))))
+                   (find (if libraryp (- address reg-start) address)
+                         funcs :test #'address-inside-p)))
              
              (if named-function (setq known t
                                       fn-start (+ (if libraryp reg-start 0)
@@ -90,7 +89,8 @@
                (multiple-value-bind (id fn-name obj-name known)
                    (address=>func-name procmap address)
                  (let ((rep-entry (find id report
-                                        :test #'(lambda (id rep-entry) (= id (report-entry-id rep-entry))))))
+                                        :key #'report-entry-id
+                                        :test #'=)))
                    (cond
                      (rep-entry
                       (incf (report-entry-cumul rep-entry))
