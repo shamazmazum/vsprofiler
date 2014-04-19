@@ -71,7 +71,6 @@
 ;; kind of report currently supported.
 (defstruct report-entry
   "Structure used by reporter to represent a function"
-  (id    0   :type address)
   (self  0   :type address)
   (cumul 0   :type address)
   (known nil :type boolean)
@@ -83,26 +82,23 @@
   (let ((samples (read-samples samples-name))
         (procmap (read-procmap procmap-name))
         (*func-table* (make-hash-table))
-        report)
+        (report (make-hash-table)))
     
     (labels ((populate-report (address &key on-top-p)
                (multiple-value-bind (id fn-name obj-name known)
                    (address=>func-name procmap address)
-                 (let ((rep-entry (find id report
-                                        :key #'report-entry-id
-                                        :test #'=)))
+                 (let ((rep-entry (gethash id report)))
                    (cond
                      (rep-entry
                       (incf (report-entry-cumul rep-entry))
                       (if on-top-p (incf (report-entry-self rep-entry))))
                      (t
-                      (push (make-report-entry :id id
-                                               :self (if on-top-p 1 0)
+                      (setf (gethash id report)
+                            (make-report-entry :self (if on-top-p 1 0)
                                                :cumul 1
                                                :fn-name fn-name
                                                :obj-name obj-name
-                                               :known known)
-                            report))))))
+                                               :known known)))))))
              
              (analize-backtrace (backtrace)
                (populate-report (car backtrace) :on-top-p t)
@@ -111,18 +107,42 @@
       (mapc #'analize-backtrace samples)
       report)))
 
+(defun get-entries-list (report strip-unknown)
+  (let (entries-list)
+    (with-hash-table-iterator (get-entry report)
+      (labels ((get-entries ()
+                 (tagbody loop1%
+                    (multiple-value-bind (val id entry)
+                        (get-entry)
+                      (declare (ignore id))
+                      (when val
+                        (if (or (not strip-unknown)
+                                (report-entry-known entry))
+                            (push entry entries-list))
+                        (go loop1%))))))
+        (get-entries)))
+    entries-list))
+
+;; FIXME: primitive table printer with fixed length of fiedls
 (defun report (report &key (sorting-method :self)
                            strip-unknown)
   "Prints the report. SORTING-METHOD may be :SELF or :CUMUL
    and determines according to which slot in a report entry
    report will be sorted."
   (declare (type (member :cumul :self) sorting-method))
-  (let* ((slot-reader (cond
-                        ((eq :cumul sorting-method) #'report-entry-cumul)
-                        ((eq :self sorting-method) #'report-entry-self)))
-         (report 
-          (flet ((sorting-pred (re1 re2)
-                   (> (funcall slot-reader re1)
-                      (funcall slot-reader re2))))
-            (sort report #'sorting-pred))))
-    (if strip-unknown (remove-if-not #'report-entry-known report) report)))
+
+  (format t "~&      Self         Cumul                    Name        Object file~%")
+  (let ((entries (get-entries-list report strip-unknown)))
+    (flet ((print-entry (entry)
+             (format t "~&~10d ~13d ~24@a ~s~%"
+                     (report-entry-self entry)
+                     (report-entry-cumul entry)
+                     (report-entry-fn-name entry)
+                     (report-entry-obj-name entry))))
+    (mapc #'print-entry
+     (sort entries #'>
+           :key
+           (cond
+             ((eq :cumul sorting-method) #'report-entry-cumul)
+             ((eq :self  sorting-method) #'report-entry-self))))))
+  t)

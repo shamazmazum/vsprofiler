@@ -22,14 +22,14 @@
                                (+ acc (report-entry-cumul x)))
                            callees :initial-value 0)))
 
-        (mapc #'(lambda (callee) (test-tree rep callee)) (cdr tree))))t
+        (mapc #'(lambda (callee) (test-tree rep callee)) (cdr tree))))
         t)
 
 (defun run-tests ()
   (let ((report (analize "../runtime/prof.smpl" "../runtime/prof.map")))
-    (print report)
+    (report report)
     (terpri)
-    (test-tree report
+    (test-tree (vsanalizer::get-entries-list report t)
                '("main" ("get_value" ("factor")) ("crc8")))))
 
 (run-tests)

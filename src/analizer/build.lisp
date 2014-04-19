@@ -25,7 +25,7 @@
                 (t
                  (format t "Cannot understand option ~A. Invoke vsanalizer without parameters to see usage~%"
                          (nth i args)))))
-         (print (apply #'vsanalizer:report report report-args))
+         (apply #'vsanalizer:report report report-args)
          (terpri)))
       (t
        (format t "Usage: vsanalizer prof.smpl prof.map [--sorting-method cumul|self] [--strip-unknown t|nil]~%"))))
