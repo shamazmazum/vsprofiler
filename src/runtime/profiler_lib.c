@@ -66,14 +66,21 @@ static void backtrace (ucontext_t *context)
 {
     inside_backtrace = 1;
     smpl_t *bp = (smpl_t*)BP(context);
+    smpl_t *prevbp = NULL;
     int i = 0;
-    while (bp && (i < MAX_STACK_DEPTH))
+    while (bp && (bp > prevbp) && (i < MAX_STACK_DEPTH))
     {
+        prevbp = bp;
         PUSH_DEBUG (sample_queue, *(bp+1));
         bp = (smpl_t*)*bp;
         i++;
     }
     if (i == MAX_STACK_DEPTH) PRINT_DEBUG ("Control stack is too large or unsupported optimizations were used\n");
+    if ((bp <= prevbp) && bp)
+    {
+        PRINT_DEBUG ("Previous frame inner to this frame. Will not save backtrace\n");
+        save_backtrace = 0;
+    }
     inside_backtrace = 0;
 }
 
