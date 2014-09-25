@@ -44,24 +44,23 @@
         fn-obj known)
     (multiple-value-bind (reg-start path)
         (address-container procmap address)
-      (cond
-        (path
-         (setq fn-obj path)
-         (multiple-value-bind (funcs were-scanned)
-             (gethash reg-start func-table)
-           (let* ((libraryp (libraryp path))
-                  (funcs (if were-scanned funcs
-                             (setf (gethash reg-start func-table)
-                                   (get-funcs (read-elf path)
-                                              :dynamicp libraryp))))
-                  (named-function
-                   (find (if libraryp (- address reg-start) address)
-                         funcs :test #'address-inside-p)))
-             
-             (if named-function (setq known t
-                                      fn-start (+ (if libraryp reg-start 0)
-                                                  (named-region-start named-function))
-                                      fn-name (named-region-name named-function))))))))
+      (when path
+        (setq fn-obj path)
+        (multiple-value-bind (funcs were-scanned)
+            (gethash reg-start func-table)
+          (let* ((libraryp (libraryp path))
+                 (funcs (if were-scanned funcs
+                            (setf (gethash reg-start func-table)
+                                  (get-funcs (read-elf path)
+                                             :dynamicp libraryp))))
+                 (named-function
+                  (find (if libraryp (- address reg-start) address)
+                        funcs :test #'address-inside-p)))
+
+            (if named-function (setq known t
+                                     fn-start (+ (if libraryp reg-start 0)
+                                                 (named-region-start named-function))
+                                     fn-name (named-region-name named-function)))))))
     (values fn-start
             fn-name
             fn-obj

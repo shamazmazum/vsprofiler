@@ -18,5 +18,10 @@
         (flet ((cons-entry (sym)
                  (make-named-region :start (value sym)
                                     :end (+ (value sym) (size sym))
-                                    :name (string-at-offset (data string-table) (name sym)))))
-          (mapcar #'cons-entry (data symtable))))))
+                                    :name (string-at-offset (data string-table) (name sym))))
+               (present-function-p (sym)
+                 (and
+                  (= (shndx sym) 12) ; FIXME: is this .text?
+                  (eq (elf:type sym) :func))))
+
+          (mapcar #'cons-entry (remove-if-not #'present-function-p (data symtable)))))))
