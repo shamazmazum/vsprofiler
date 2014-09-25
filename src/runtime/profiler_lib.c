@@ -219,8 +219,11 @@ void prof_end ()
     PRINT_DEBUG ("Saving results\n");
     FILE *out = fopen ("prof.smpl", "w");
     op_res = (out == NULL) ? -1 : 0;
-    if (!op_res) op_res = op_res || save_samples (out);
-    fclose (out);
+    if (!op_res)
+    {
+        op_res = op_res || save_samples (out);
+        fclose (out);
+    }
     if (op_res) PRINT_ERROR ("Cannot write sample file\n");
 
     PRINT_DEBUG ("Saving process map\n");
