@@ -24,10 +24,8 @@ static int frames_restored = 0; // Number of restored stack frames
 static int sucession_flags = 0; // Contains any prombles encountered
 
 #define TOO_MANY_FRAMES  0x01
-#define BP_NOT_MONOTONIC 0x02
 
 #if defined __x86_64__
-#define MEM_TOP 0x800000000000
 #if defined(__DragonFly__) || defined(__FreeBSD__)
 #define PROCMAP "/proc/curproc/map"
 #define IP(ctx) ctx->uc_mcontext.mc_rip
@@ -59,7 +57,6 @@ static void backtrace (ucontext_t *context)
 {
     inside_backtrace = 1;
     smpl_t *bp = (smpl_t*)BP(context);
-    smpl_t *old_bp = (smpl_t*)MEM_TOP;
     int i = 0;
     while (bp)
     {
@@ -68,13 +65,7 @@ static void backtrace (ucontext_t *context)
             sucession_flags |= TOO_MANY_FRAMES;
             break;
         }
-        if (bp >= old_bp)
-        {
-            sucession_flags |= BP_NOT_MONOTONIC;
-            break;
-        }
         PUSH_DEBUG (sample_queue, *(bp+1));
-        old_bp = bp;
         bp = (smpl_t*)*bp;
         i++;
     }
@@ -241,6 +232,4 @@ void prof_end ()
         PRINT_DEBUG ("%i stack frames was restored during execution\n", frames_restored);
     if (sucession_flags & TOO_MANY_FRAMES)
         PRINT_DEBUG ("Control stack is too large or unsupported optimizations were used\n");
-    if (sucession_flags & BP_NOT_MONOTONIC)
-        PRINT_DEBUG ("Your program was compiled with -fomit-frame-pointer maybe\n");
 }
