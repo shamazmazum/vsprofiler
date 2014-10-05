@@ -21,8 +21,13 @@ int save_backtrace = 0; // Save content of the stack too (experimental)
 // Other
 static int inside_backtrace = 0; // Is control inside function backtrace()?
 static int frames_restored = 0; // Number of restored stack frames
+static int sucession_flags = 0; // Contains any prombles encountered
+
+#define TOO_MANY_FRAMES  0x01
+#define BP_NOT_MONOTONIC 0x02
 
 #if defined __x86_64__
+#define MEM_TOP 0x800000000000
 #if defined(__DragonFly__) || defined(__FreeBSD__)
 #define PROCMAP "/proc/curproc/map"
 #define IP(ctx) ctx->uc_mcontext.mc_rip
@@ -54,14 +59,25 @@ static void backtrace (ucontext_t *context)
 {
     inside_backtrace = 1;
     smpl_t *bp = (smpl_t*)BP(context);
+    smpl_t *old_bp = (smpl_t*)MEM_TOP;
     int i = 0;
-    while (bp && (i < MAX_STACK_DEPTH))
+    while (bp)
     {
+        if (i == MAX_STACK_DEPTH)
+        {
+            sucession_flags |= TOO_MANY_FRAMES;
+            break;
+        }
+        if (bp >= old_bp)
+        {
+            sucession_flags |= BP_NOT_MONOTONIC;
+            break;
+        }
         PUSH_DEBUG (sample_queue, *(bp+1));
+        old_bp = bp;
         bp = (smpl_t*)*bp;
         i++;
     }
-    if (i == MAX_STACK_DEPTH) PRINT_DEBUG ("Control stack is too large or unsupported optimizations were used\n");
     inside_backtrace = 0;
 }
 
@@ -70,7 +86,7 @@ static void restore_frame_if_needed (ucontext_t *context)
     // Fix the situations where we've just entered in a new function and
     // the stack frame was not properly created (or we are ready to leave
     // and the frame is already destroyed)
-    // Works just for x86/x86-64, of course.
+    // Works just for x86-64, of course.
     unsigned char *ip = (void*)IP(context);
     
     // KLUDGE: There can be other instructions between push %rbp and mov %rsp,%rbp
@@ -221,5 +237,10 @@ void prof_end ()
     PRINT_DEBUG ("Freeing sample queue\n");
     squeue_free (sample_queue);
 
-    PRINT_DEBUG ("%i stack frames was restored during execution\n", frames_restored);
+    if (save_backtrace)
+        PRINT_DEBUG ("%i stack frames was restored during execution\n", frames_restored);
+    if (sucession_flags & TOO_MANY_FRAMES)
+        PRINT_DEBUG ("Control stack is too large or unsupported optimizations were used\n");
+    if (sucession_flags & BP_NOT_MONOTONIC)
+        PRINT_DEBUG ("Your program was compiled with -fomit-frame-pointer maybe\n");
 }
