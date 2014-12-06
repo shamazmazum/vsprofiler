@@ -122,6 +122,8 @@
                  (let ((caller  (car subtree))
                        (callees (cdr subtree)))
                    (let ((caller% (find (graph-node-id caller) report-list :key #'graph-node-id)))
+                     ;; If there is a node with such id in the report already, sum the results, otherwise
+                     ;; add it to the report
                      (cond
                        (caller%
                         (incf (graph-node-self  caller%)
