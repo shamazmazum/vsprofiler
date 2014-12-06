@@ -86,7 +86,7 @@ Analizer tool
 The analizer tool can be used as follows:
 
 ```
-vsanalizer prof.smpl prof.map flat|graph [--strip-unknown t|nil] [--sorting-method self|cumul] [--output out]
+vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] [--output out] prof.smpl prof.map flat|graph
 ```
 
 The first two arguments are what the runtime library creates. The third mandatory argument specifies what kind of

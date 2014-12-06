@@ -7,6 +7,7 @@
 (require 'asdf)
 (asdf:load-system :elf)
 (asdf:load-system :esrap)
+(asdf:load-system :apply-argv)
 
 (load "package.lisp")
 (load "input-parser.lisp")

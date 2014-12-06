@@ -1,47 +1,51 @@
 ;; Tool for building analizer
 (load "prereq.lisp")
 
+(defun print-usage ()
+  (format t "Usage: vsanalizer [--sorting-method cumul|self] [--strip-unknown t|nil] [--output filename] prof.smpl prof.map flat|graph~%")
+#+clisp (ext:quit 0)
+#+sbcl (sb-ext:quit))
+
 (defun analizer-impl ()
-  (let ((args #+sbcl (cdr sb-ext:*posix-argv*)
-              #+clisp ext:*args*))
-    (cond
-      ((and (>= (length args) 3)
-            (< (length args) 8))
-       (let ((report (vsanalizer:call-graph (nth 0 args)
-                                            (nth 1 args)))
-             (report-type (nth 2 args))
-             report-args
-             (output *standard-output*))
-         (loop for i from 3 below (length args) by 2 do
-              (cond
-                ((and (string= "--sorting-method" (nth i args))
-                      (string= "self" (nth (1+ i) args)))
-                 (setq report-args (nconc (list :sorting-method :self) report-args)))
-                
-                ((and (string= "--sorting-method" (nth i args))
-                      (string= "cumul" (nth (1+ i) args)))
-                 (setq report-args (nconc (list :sorting-method :cumul) report-args)))
-                
-                ((and (string= "--strip-unknown" (nth i args))
-                      (string= "t" (nth (1+ i) args)))
-                 (setq report-args (nconc (list :strip-unknown t) report-args)))
-                ((string= "--output" (nth i args))
-                 (setq output (open (nth (1+ i) args)
-                                    :direction :output
-                                    :if-does-not-exist :create
-                                    :if-exists :supersede)))
-                (t
-                 (format t "Cannot understand option ~A. Invoke vsanalizer without parameters to see usage~%"
-                         (nth i args)))))
-         (unwind-protect
-              (apply (cond
-                       ((string= report-type "flat")  #'vsanalizer:flat-report)
-                       ((string= report-type "graph") #'vsanalizer:graphviz-report)
-                       (t (error "Report type must be 'flat' or 'graph'~%")))
-                     report :stream output report-args)
-           (close output))))
-      (t
-       (format t "Usage: vsanalizer prof.smpl prof.map flat|graph [--sorting-method cumul|self] [--strip-unknown t|nil] [--output filename]~%"))))
+  (let ((args (apply-argv:parse-argv (apply-argv:get-argv))))
+    (if (or (/= (length (car args)) 3)
+            (> (length (cdr args)) 6))
+        (print-usage))
+    (destructuring-bind ((samples-name procmap-name report-type) &rest options)
+        args
+      (let ((call-graph (vsanalizer:call-graph samples-name procmap-name))
+            report-args)
+
+        (macrolet ((if-option ((var option) &body body)
+                     `(let ((,var (getf options ,option)))
+                        (if ,var (progn ,@body)))))
+          (if-option (sorting-method :sorting-method)
+                     (push (cond
+                             ((string-equal sorting-method "self") :self)
+                             ((string-equal sorting-method "cumul") :cumul)
+                             (t (error "Wrong sorting method")))
+                           report-args)
+                     (push :sorting-method report-args))
+
+          (if-option (strip-unknown :strip-unknown)
+                     (push (string-equal "t" strip-unknown) report-args)
+                     (push :strip-unknown report-args))
+
+          (if-option (output :output)
+                     (push (open output
+                                 :direction :output
+                                 :if-does-not-exist :create
+                                 :if-exists :supersede) report-args)
+                     (push :output report-args))
+
+          (unwind-protect
+               (apply (cond
+                        ((string= report-type "flat")  #'vsanalizer:flat-report)
+                        ((string= report-type "graph") #'vsanalizer:graphviz-report)
+                        (t (error "Report type must be 'flat' or 'graph'~%")))
+                      call-graph report-args)
+            (if-option (output :output)
+                       (close (getf report-args :output))))))))
   #+clisp (ext:quit 0))
 
 #+sbcl
