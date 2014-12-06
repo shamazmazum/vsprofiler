@@ -66,82 +66,110 @@
             fn-obj
             known)))
 
-;; Flat report without building the call graph is the only
-;; kind of report currently supported.
-(defstruct report-entry
-  "Structure used by reporter to represent a function"
+(defstruct graph-node
+  "A node of call graph"
+  (id    0   :type address)
   (self  0   :type address)
   (cumul 0   :type address)
   (known nil :type boolean)
   fn-name
   obj-name)
 
-(defun analize (samples-name procmap-name)
-  "Processes output of C runtime library and returns a report"
+(defun call-graph (samples-name procmap-name)
+  "Processes output of C runtime library and returns a call graph"
   (let ((samples (read-samples samples-name))
         (procmap (read-procmap procmap-name))
-        (*func-table* (make-hash-table))
-        (report (make-hash-table)))
-    
-    (labels ((populate-report (address &key on-top-p)
-               (multiple-value-bind (id fn-name obj-name known)
-                   (address=>func-name procmap address)
-                 (let ((rep-entry (gethash id report)))
-                   (cond
-                     (rep-entry
-                      (incf (report-entry-cumul rep-entry))
-                      (if on-top-p (incf (report-entry-self rep-entry))))
-                     (t
-                      (setf (gethash id report)
-                            (make-report-entry :self (if on-top-p 1 0)
-                                               :cumul 1
-                                               :fn-name fn-name
-                                               :obj-name obj-name
-                                               :known known)))))))
-             
-             (analize-backtrace (backtrace)
-               (populate-report (car backtrace) :on-top-p t)
-               (mapc #'populate-report (cdr backtrace))))
+        (*func-table* (make-hash-table)))
+    (labels ((populate-graph (subgraph sample)
+               (if sample
+                   (let ((caller-sample (car sample))
+                         (callee-samples (cdr sample)))
+                     (multiple-value-bind (caller-id caller-name caller-obj-name caller-known)
+                         (address=>func-name procmap caller-sample)
 
-      (mapc #'analize-backtrace samples)
-      report)))
+                       (let ((caller-subtree (find caller-id subgraph :key (lambda (subtree)
+                                                                                   (graph-node-id (car subtree))))))
+                               (if caller-subtree
+                                   (let ((caller (car caller-subtree)))
+                                     (incf (graph-node-cumul caller))
+                                     (incf (graph-node-self caller) (if callee-samples 0 1))
+                                     (cons (cons caller (populate-graph (cdr caller-subtree) callee-samples))
+                                           (remove caller-subtree subgraph)))
+                                   (let ((caller (make-graph-node :id caller-id
+                                                                  :self (if callee-samples 0 1)
+                                                                  :cumul 1
+                                                                  :known caller-known
+                                                                  :fn-name caller-name
+                                                                  :obj-name caller-obj-name)))
+                                     (cons
+                                      (cons caller (populate-graph nil callee-samples))
+                                      subgraph))))))
+                   subgraph)))
+      (reduce (lambda (subgraph sample)
+                (populate-graph subgraph (reverse sample)))
+              samples :initial-value nil))))
 
-(defun get-entries-list (report strip-unknown)
-  (let (entries-list)
-    (with-hash-table-iterator (get-entry report)
-      (labels ((get-entries ()
-                 (tagbody loop1%
-                    (multiple-value-bind (val id entry)
-                        (get-entry)
-                      (declare (ignore id))
-                      (when val
-                        (if (or (not strip-unknown)
-                                (report-entry-known entry))
-                            (push entry entries-list))
-                        (go loop1%))))))
-        (get-entries)))
-    entries-list))
+(defun flat-report (call-graph &key (sorting-method :self)
+                                 strip-unknown (stream *standard-output*) &allow-other-keys)
+  "Prints a flat report. SORTING-METHOD may be :SELF or :CUMUL
+   and determines according to which slot in a GRAPH-NODE struct
+   an entry will be sorted."
+  (declare (type (member :self :cumul) sorting-method)
+           (type boolean strip-unknown))
+  (let (report-list)
+    (labels ((populate-list (subtree)
+               (when subtree
+                 (let ((caller  (car subtree))
+                       (callees (cdr subtree)))
+                   (let ((caller% (find (graph-node-id caller) report-list :key #'graph-node-id)))
+                     (cond
+                       (caller%
+                        (incf (graph-node-self  caller%)
+                              (graph-node-self  caller))
+                        (incf (graph-node-cumul caller%)
+                              (graph-node-cumul caller)))
+                       (t (push caller report-list))))
+                   (mapc #'populate-list callees))))
 
-;; FIXME: primitive table printer with fixed length of fiedls
-(defun report (report &key (sorting-method :self)
-                           strip-unknown)
-  "Prints the report. SORTING-METHOD may be :SELF or :CUMUL
-   and determines according to which slot in a report entry
-   report will be sorted."
-  (declare (type (member :cumul :self) sorting-method))
+             (print-entry (entry)
+               (format stream "~&~10d ~13d ~24@a ~s~%"
+                       (graph-node-self entry)
+                       (graph-node-cumul entry)
+                       (graph-node-fn-name entry)
+                       (graph-node-obj-name entry))))
 
-  (format t "~&      Self         Cumul                    Name        Object file~%")
-  (let ((entries (get-entries-list report strip-unknown)))
-    (flet ((print-entry (entry)
-             (format t "~&~10d ~13d ~24@a ~s~%"
-                     (report-entry-self entry)
-                     (report-entry-cumul entry)
-                     (report-entry-fn-name entry)
-                     (report-entry-obj-name entry))))
-    (mapc #'print-entry
-     (sort entries #'>
-           :key
-           (cond
-             ((eq :cumul sorting-method) #'report-entry-cumul)
-             ((eq :self  sorting-method) #'report-entry-self))))))
+      (mapc #'populate-list call-graph)
+      (format stream "~&      Self         Cumul                    Name        Object file~%")
+      (mapc #'print-entry
+            (sort (if strip-unknown
+                      (remove nil report-list :key #'graph-node-known)
+                      report-list)
+                  #'>
+                  :key (cond
+                         ((eq :cumul sorting-method) #'graph-node-cumul)
+                         ((eq :self  sorting-method) #'graph-node-self))))))
   t)
+
+(defun graphviz-report (call-graph &key (stream *standard-output*) &allow-other-keys)
+  "Prints a report in DOT langauge understandable by graphviz."
+  (format stream "digraph call_graph {~%")
+  (labels ((print-callees (caller-sym callees)
+             (loop for callee in callees
+                   ;; We use (gensym) here to distinguish two different paths ending up in the same callee
+                   for callee-sym = (gensym) do
+                  (format stream "~A -> ~A~%"
+                          caller-sym callee-sym)
+                  ;; Descend the tree
+                  (print-caller (car callee) (cdr callee) callee-sym)))
+           (print-caller (caller callees caller-sym)
+             (when caller
+               (format stream "~A[label=\"~A\\nself=~D\\ncumul=~D\"]~%"
+                         caller-sym
+                         (graph-node-fn-name caller)
+                         (graph-node-self caller)
+                         (graph-node-cumul caller))
+               (print-callees caller-sym callees))))
+    (write-string "ROOT[shape=\"rectangle\"]" stream)
+    (terpri stream)
+    (print-callees :root call-graph))
+  (format stream "}~%"))
