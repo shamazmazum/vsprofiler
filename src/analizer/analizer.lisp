@@ -32,7 +32,8 @@
   "Is the filename designates a library?"
   (search ".so" path))
 
-(defun address=>func-name (procmap address &optional (func-table *func-table*))
+(defun address=>func-name (procmap address &optional (func-table (if (boundp '*func-table*)
+                                                                     *func-table* (make-hash-table))))
   "Accepts a process map PROCMAP and an ADDRESS and returns three values:
    1) a begining of the function the ADDRESS belongs to (or just the ADDRESS
    if function is not present in symbol table)
