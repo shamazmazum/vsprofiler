@@ -36,7 +36,7 @@
                                  :direction :output
                                  :if-does-not-exist :create
                                  :if-exists :supersede) report-args)
-                     (push :output report-args))
+                     (push :stream report-args))
 
           (unwind-protect
                (apply (cond
@@ -45,7 +45,7 @@
                         (t (error "Report type must be 'flat' or 'graph'~%")))
                       call-graph report-args)
             (if-option (output :output)
-                       (close (getf report-args :output))))))))
+                       (close (getf report-args :stream))))))))
   #+clisp (ext:quit 0))
 
 #+sbcl
