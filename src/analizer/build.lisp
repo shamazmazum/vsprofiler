@@ -29,23 +29,13 @@
 
           (if-option (strip-unknown :strip-unknown)
                      (push (string-equal "t" strip-unknown) report-args)
-                     (push :strip-unknown report-args))
+                     (push :strip-unknown report-args)))
 
-          (if-option (output :output)
-                     (push (open output
-                                 :direction :output
-                                 :if-does-not-exist :create
-                                 :if-exists :supersede) report-args)
-                     (push :stream report-args))
-
-          (unwind-protect
-               (apply (cond
-                        ((string= report-type "flat")  #'vsanalizer:flat-report)
-                        ((string= report-type "graph") #'vsanalizer:graphviz-report)
-                        (t (error "Report type must be 'flat' or 'graph'~%")))
-                      call-graph report-args)
-            (if-option (output :output)
-                       (close (getf report-args :stream))))))))
+        (apply (cond
+                 ((string= report-type "flat")  #'vsanalizer:flat-report)
+                 ((string= report-type "graph") #'vsanalizer:graphviz-report)
+                 (t (error "Report type must be 'flat' or 'graph'~%")))
+               call-graph report-args))))
   #+clisp (ext:quit 0))
 
 #+sbcl
