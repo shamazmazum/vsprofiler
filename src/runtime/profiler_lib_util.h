@@ -3,5 +3,6 @@
 
 int copy_file (const char*, const char*);
 void parse_parameters ();
+void get_output_names (char*, char*);
 
 #endif

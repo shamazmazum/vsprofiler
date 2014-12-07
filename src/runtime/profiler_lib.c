@@ -210,9 +210,13 @@ void prof_end ()
     int op_res;
     PRINT_DEBUG ("Stopping timer, anyway\n");
     if (prof_stop ()) abort();
+
+    char samples[256];
+    char procmap[256];
+    get_output_names (samples, procmap);
     
-    PRINT_DEBUG ("Saving results\n");
-    FILE *out = fopen ("prof.smpl", "w");
+    PRINT_DEBUG ("Saving samples in %s\n", samples);
+    FILE *out = fopen (samples, "w");
     op_res = (out == NULL) ? -1 : 0;
     if (!op_res)
     {
@@ -221,8 +225,8 @@ void prof_end ()
     }
     if (op_res) PRINT_ERROR ("Cannot write sample file\n");
 
-    PRINT_DEBUG ("Saving process map\n");
-    op_res = copy_file (PROCMAP, "prof.map");
+    PRINT_DEBUG ("Saving process map in %s\n", procmap);
+    op_res = copy_file (PROCMAP, procmap);
     if (op_res) PRINT_ERROR ("Cannot write map file\n");
 
     PRINT_DEBUG ("Freeing sample queue\n");

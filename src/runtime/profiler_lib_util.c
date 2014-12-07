@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -50,5 +51,19 @@ void parse_parameters ()
         else if (strncmp ("SAMPLE_INTERVAL=", entry, 16) == 0) sample_interval = atoi (entry+16);
         else if (strncmp ("PROF_AUTOSTART=", entry, 15) == 0) profile_all = atoi (entry+15);
         else if (strncmp ("PROF_BACKTRACE=", entry, 15) == 0) save_backtrace = atoi (entry+15);
+    }
+}
+
+void get_output_names (char *samples, char *procmap)
+{
+    struct stat sb;
+    int i, res;
+    res = 0;
+    for (i=0; !(res); i++)
+    {
+        sprintf (samples, "prof%i.smpl", i);
+        sprintf (procmap, "prof%i.map", i);
+        res =  stat (samples, &sb);
+        res &= stat (procmap, &sb);
     }
 }
