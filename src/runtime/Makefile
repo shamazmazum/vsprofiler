@@ -22,7 +22,7 @@ example: example.c
 	$(CC) -lm -o $@ $^
 
 clean:
-	rm -f $(TARGET) *.o tests example prof.map prof.smpl
+	rm -f $(TARGET) *.o tests example prof*.map prof*.smpl
 .PHONY: clean
 
 test: tests example $(TARGET) run-tests.sh

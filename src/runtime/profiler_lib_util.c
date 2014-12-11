@@ -2,23 +2,22 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "profiler_lib.h"
 #include "profiler_lib_util.h"
+#include "verbose.h"
 
 extern char **environ;
 
 int copy_file (const char *in, const char *out)
 {
-    int copy_ok = 1;
     int fin = open (in, O_RDONLY);
-    if (fin == -1) goto ret;
+    if (fin == -1) goto err;
     int fout = open (out, O_WRONLY|O_CREAT|O_TRUNC, DEFFILEMODE);
-    if (fout == -1) goto close_in;
+    if (fout == -1) goto err;
 
 #define BLOCK_SIZE 4096
     uint8_t buf[BLOCK_SIZE];
@@ -26,18 +25,21 @@ int copy_file (const char *in, const char *out)
     do
     {
         bytes_read = read (fin, buf, sizeof(buf));
-        if (bytes_read < 0) {copy_ok = 0; goto close_out;}
+        if (bytes_read < 0) goto err;
         bytes_written = write (fout, buf, bytes_read);
-        if (bytes_written != bytes_read) {copy_ok = 0; goto close_out;}
+        if (bytes_written != bytes_read) goto err;
     }
     while (bytes_read != 0);
+#undef BLOCK_SIZE
 
-close_out:
-    close (fout);
-close_in: ;
     close (fin);
-ret:
-    return ((fin != -1) && (fout != -1) && copy_ok) ? 0 : -1;
+    close (fout);
+    return 0;
+
+err:
+    if (fin != -1) close (fin);
+    if (fout != -1) close (fout);
+    return -1;
 }
 
 void parse_parameters ()
@@ -47,10 +49,16 @@ void parse_parameters ()
     for (env = environ; *env; env++)
     {
         entry = *env;
-        if (strncmp ("MAX_SAMPLES=", entry, 12) == 0) max_samples = atoi (entry+12);
-        else if (strncmp ("SAMPLE_INTERVAL=", entry, 16) == 0) sample_interval = atoi (entry+16);
-        else if (strncmp ("PROF_AUTOSTART=", entry, 15) == 0) profile_all = atoi (entry+15);
-        else if (strncmp ("PROF_BACKTRACE=", entry, 15) == 0) save_backtrace = atoi (entry+15);
+        if (strncmp ("MAX_SAMPLES=", entry, 12) == 0)
+            max_samples = atoi (entry+12);
+        else if (strncmp ("SAMPLE_INTERVAL=", entry, 16) == 0)
+            sample_interval = atoi (entry+16);
+        else if (strncmp ("PROF_AUTOSTART=", entry, 15) == 0)
+            profile_all = atoi (entry+15);
+        else if (strncmp ("PROF_BACKTRACE=", entry, 15) == 0)
+            save_backtrace = atoi (entry+15);
+        else if (strncmp ("PROF_VERBOSE=", entry, 13) == 0)
+            verbose = atoi (entry+13);
     }
 }
 
