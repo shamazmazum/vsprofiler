@@ -2,6 +2,7 @@
   (:use #:cl #:elf #:esrap)
   (:shadowing-import-from :cl :type)
   (:export #:call-graph #:flat-report #:graphviz-report
+           #:strip-unknown
 
            #:graph-node
            #:graph-node-self

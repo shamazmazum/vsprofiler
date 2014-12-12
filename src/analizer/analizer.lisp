@@ -105,13 +105,23 @@
                 (populate-graph subgraph (reverse sample)))
               samples :initial-value nil))))
 
+(defun strip-unknown (call-graph)
+  "Strip call graph of unknown functions"
+  (labels ((collect-known (known subtree)
+             (let ((caller  (car subtree))
+                   (callees (strip-unknown (cdr subtree))))
+               (if (graph-node-fn-name caller)
+                   (cons (cons caller callees) known)
+                   (append callees known)))))
+    (if call-graph
+        (reduce #'collect-known call-graph :initial-value nil))))
+
 (defun flat-report (call-graph &key (sorting-method :self)
-                                 strip-unknown (stream *standard-output*) &allow-other-keys)
+                                 (stream *standard-output*) &allow-other-keys)
   "Prints a flat report. SORTING-METHOD may be :SELF or :CUMUL
    and determines according to which slot in a GRAPH-NODE struct
    an entry will be sorted."
-  (declare (type (member :self :cumul) sorting-method)
-           (type boolean strip-unknown))
+  (declare (type (member :self :cumul) sorting-method))
   (let (report-list)
     (labels ((populate-list (subtree)
                (when subtree
@@ -139,9 +149,7 @@
       (mapc #'populate-list call-graph)
       (format stream "~&      Self         Cumul                    Name        Object file~%")
       (mapc #'print-entry
-            (sort (if strip-unknown
-                      (remove-if-not #'graph-node-fn-name report-list)
-                      report-list)
+            (sort report-list
                   #'>
                   :key (cond
                          ((eq :cumul sorting-method) #'graph-node-cumul)

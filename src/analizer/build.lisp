@@ -25,17 +25,15 @@
                              ((string-equal sorting-method "cumul") :cumul)
                              (t (error "Wrong sorting method")))
                            report-args)
-                     (push :sorting-method report-args))
-
-          (if-option (strip-unknown :strip-unknown)
-                     (push (string-equal "t" strip-unknown) report-args)
-                     (push :strip-unknown report-args)))
+                     (push :sorting-method report-args)))
 
         (apply (cond
                  ((string= report-type "flat")  #'vsanalizer:flat-report)
                  ((string= report-type "graph") #'vsanalizer:graphviz-report)
                  (t (error "Report type must be 'flat' or 'graph'~%")))
-               call-graph report-args))))
+               (funcall (if (equal (getf options :strip-unknown) "t")
+                            #'vsanalizer:strip-unknown #'identity) call-graph)
+               report-args))))
   #+clisp (ext:quit 0))
 
 #+sbcl
