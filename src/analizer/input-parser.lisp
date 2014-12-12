@@ -123,7 +123,29 @@
       (remove-if-not #'executablep
                      (parse-stream in 'procmap-entry-rule)))))
 
+#|(defun read-samples (samples-name)
+  "Parse file of samples with the name SAMPLES-NAME"
+  (with-open-file (in samples-name)
+    (parse-stream in 'sample-rule)))|#
+
+;; Non-esrap sample reader (It turns out that esrap is too slow and a bottleneck)
+(defun split-sequence (sequence delimiter &optional res end)
+  "Break SEQUENCE to a list of subsequences delimited by DELIMITER"
+  (let ((pos (position delimiter sequence :from-end t :end end)))
+    (if pos
+        (split-sequence sequence delimiter (cons (subseq sequence (1+ pos) end) res)
+                        pos)
+      (cons (subseq sequence 0 end) res))))
+
+(defun parse-c-hex (string)
+  "Parse a hex number printed by C library"
+  (parse-integer (subseq string 2)
+                 :radix #x10))
+
 (defun read-samples (samples-name)
   "Parse file of samples with the name SAMPLES-NAME"
   (with-open-file (in samples-name)
-    (parse-stream in 'sample-rule)))
+    (loop for line = (read-line in nil)
+          while line collect
+          ;; 'The last' on next line is 0x0, so skip it
+          (mapcar #'parse-c-hex (butlast (split-sequence line #\Space))))))

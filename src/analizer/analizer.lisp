@@ -1,5 +1,8 @@
 (in-package :vsanalizer)
 
+(defparameter *unknown-function-name* "<Unknown function>"
+  "Bogus name of an unknown function")
+
 ;; Just in case...
 (defmacro defvar-unbound (var-name &optional documentation)
   "Helper macro to define unbound variable with documentation"
@@ -23,7 +26,7 @@
    the file is mapped to as an additional value"
   (let ((entry (find address procmap :test #'address-inside-p)))
     (and entry
-         (values
+         (values t
           (named-region-start entry)
           (named-region-name entry)))))
 
@@ -37,16 +40,11 @@
   "Accepts a process map PROCMAP and an ADDRESS and returns three values:
    1) a begining of the function the ADDRESS belongs to (or just the ADDRESS
    if function is not present in symbol table)
-   2) name of the function
-   3) name of an object file which contains the function
-   4) T if function is present in symbol table, NIL otherwise"
-  (let ((fn-start address)
-        (fn-name "<Unknown function>")
-        fn-obj known)
-    (multiple-value-bind (reg-start path)
-        (address-container procmap address)
-      (when path
-        (setq fn-obj path)
+   2) name of an object file which contains the function (or nil if not known)
+   3) name of the function (or nil if not known)"
+  (multiple-value-bind (known reg-start path)
+      (address-container procmap address)
+    (if known
         (multiple-value-bind (funcs were-scanned)
             (gethash reg-start func-table)
           (let* ((libraryp (libraryp path))
@@ -58,21 +56,19 @@
                   (find (if libraryp (- address reg-start) address)
                         funcs :test #'address-inside-p)))
 
-            (if named-function (setq known t
-                                     fn-start (+ (if libraryp reg-start 0)
-                                                 (named-region-start named-function))
-                                     fn-name (named-region-name named-function)))))))
-    (values fn-start
-            fn-name
-            fn-obj
-            known)))
+            (if named-function
+                (values (+ (if libraryp reg-start 0)
+                           (named-region-start named-function)) ; Function entry point
+                        path                                    ; Path to object file
+                        (named-region-name named-function))     ; Function name
+                (values address path))))
+        address)))
 
 (defstruct graph-node
   "A node of call graph"
   (id    0   :type address)
   (self  0   :type address)
   (cumul 0   :type address)
-  (known nil :type boolean)
   fn-name
   obj-name)
 
@@ -85,7 +81,7 @@
                (if sample
                    (let ((caller-sample (car sample))
                          (callee-samples (cdr sample)))
-                     (multiple-value-bind (caller-id caller-name caller-obj-name caller-known)
+                     (multiple-value-bind (caller-id caller-obj-name caller-name)
                          (address=>func-name procmap caller-sample)
 
                        (let ((caller-subtree (find caller-id subgraph :key (lambda (subtree)
@@ -99,7 +95,6 @@
                                    (let ((caller (make-graph-node :id caller-id
                                                                   :self (if callee-samples 0 1)
                                                                   :cumul 1
-                                                                  :known caller-known
                                                                   :fn-name caller-name
                                                                   :obj-name caller-obj-name)))
                                      (cons
@@ -138,14 +133,14 @@
                (format stream "~&~10d ~13d ~24@a ~s~%"
                        (graph-node-self entry)
                        (graph-node-cumul entry)
-                       (graph-node-fn-name entry)
+                       (or (graph-node-fn-name entry) *unknown-function-name*)
                        (graph-node-obj-name entry))))
 
       (mapc #'populate-list call-graph)
       (format stream "~&      Self         Cumul                    Name        Object file~%")
       (mapc #'print-entry
             (sort (if strip-unknown
-                      (remove nil report-list :key #'graph-node-known)
+                      (remove-if-not #'graph-node-fn-name report-list)
                       report-list)
                   #'>
                   :key (cond
@@ -168,7 +163,7 @@
              (when caller
                (format stream "~A[label=\"~A\\nself=~D\\ncumul=~D\"]~%"
                          caller-sym
-                         (graph-node-fn-name caller)
+                         (or (graph-node-fn-name caller) *unknown-function-name*)
                          (graph-node-self caller)
                          (graph-node-cumul caller))
                (print-callees caller-sym callees))))
