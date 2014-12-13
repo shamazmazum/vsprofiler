@@ -88,3 +88,12 @@ A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the num
 on top of the stack. ```Cumul``` means the number of samples when function was on stack regarless to its
 position. ```Self``` is always less or equal to ```Cumul```. ```main``` function usually has the biggest
 ```Cumul``` unless there are 'heavy' recursive functions.
+
+How to port
+-----------
+
+If you want this tool in, in example, Linux you can easily port it (as to any other POSIX OS with procfs). First
+of all, you need to provide the runtime library with ```PROCMAP```, ```IP```, ```BP``` and ```SP``` macros (see
+```src/runtime/profiler_lib.c```). The three last point where rip, rbp and rsp registers are saved in
+context. Then you should create rules to parse map files in ```src/analizer/input-parser.lisp```. It should work
+then.
