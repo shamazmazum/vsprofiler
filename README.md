@@ -15,38 +15,10 @@ Its pluses:
 Its minuses:
 ------------
 * No multithreading support
-* Small amount of supported platforms (FreeBSD/DragonFlyBSD on x86/x86-64 machine)
+* Small amount of supported platforms (FreeBSD/DragonFlyBSD/NetBSD on x86-64 machine)
 * Requires Common Lisp implementation for analizer (clisp or sbcl will do) with cl-elf and esrap 
   (sorry, CL is my weakness)
 * Cannot calculate precise number of calls to function (it's very hard in C without recompilation)
-
-UPD: Vorsicht!
--------------
-You can also analize stack when each sample is taken. To do so run your program with PROF_BACKTRACE environment 
-variable set to non-zero like so:
-```
-$ LD_PRELOAD=/path/to/libvsprof.so PROF_AUTOSTART=1 PROF_BACKTRACE=1 program_to_profile
-```
-
-You will get a report like this:
-```
-      Self         Cumul                    Name        Object file
-      7029          7029                     crc8 "/home/vasily/vsprofiler/src/runtime/example"
-      2374          2374                   factor "/home/vasily/vsprofiler/src/runtime/example"
-       350          9999                     main "/home/vasily/vsprofiler/src/runtime/example"
-       246          2620                get_value "/home/vasily/vsprofiler/src/runtime/example"
-         1             1       <Unknown function> "/lib/libc.so.7"
-         0             1                   atexit "/lib/libc.so.7"
-         0         10000                   _start "/home/vasily/vsprofiler/src/runtime/example"
-         0         10000       <Unknown function> NIL
-
-```
-
-Numbers in the "Cumul" column are numbers of samples the function was on stack and in the "Self" column are numbers
-of samples the function was on top of it.
-
-Unfortunately, when the program was compiled with "bad" optimization flags (like -fomit-frame-pointer), the profiler
-can even crash with this option enabled.
 
 How to build/use:
 ----------------
@@ -59,8 +31,8 @@ Now you can run your program with the profiler by preloading the library:
 $ LD_PRELOAD=/path/to/libvsprof.so PROF_AUTOSTART=1 program_to_profile
 ```
 
-It will create two files: prof.smpl and prof.map in the current working directory. Then run vsanalizer with these
-two files as arguments (see below what "flat" means):
+It will create two files: profX.smpl and profX.map in the current working directory, where X is some number. Then
+run vsanalizer with these two files as arguments (see below what "flat" means):
 ```
 $ /path/to/vsanalizer prof.smpl prof.map flat
 ```
@@ -76,21 +48,43 @@ and get something like this:
 
 ```
 
-Another way to use the profiler is to link with libvsprof.so in build time and use
+Another way to use the profiler is to link against libvsprof.so in build time and use
 prof_start() and prof_stop() functions (declared in profiler_lib.h) to start and stop
 profiler explicitly.
 
-Analizer tool
-------------
+The runtime library
+------------------
+The runtime library, named libvsprof.so is what you need to link to a program you want to profile. As mentioned
+above, it can be done either in build time or with LD_PRELOAD environment variable. The libarary understands
+following additional environment variables:
+
+* ```MAX_SAMPLES``` is used to specify maximum limit of samples. Defaults to 10000
+* ```SAMPLE_INTERVAL``` is an interval in microseconds between two samples taken. Defaults to 1000 (1ms)
+* ```PROF_AUTOSTART``` starts profiling immediately when set to nonzero. Otherwise the program must call
+  prof_start() and prof_stop() explicitly.
+* ```PROF_BACKTRACE``` enables saving backtrace for each sample when set to nonzero, so you can print graph
+  reports.
+* ```PROF_VERBOSE``` is the verbosity level. Can be 0, 1 or 2.
+
+Note, that ```PROF_BACKTRACE``` will not work and likely crash your program if it (or any system library used,
+including libc) is compilled with -fomit-frame-pointer optimization.
+
+The analizer tool
+----------------
 
 The analizer tool can be used as follows:
 
 ```
-vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] [--output out] prof.smpl prof.map flat|graph
+vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] prof.smpl prof.map flat|graph
 ```
 
-The first two arguments are what the runtime library creates. The third mandatory argument specifies what kind of
-report will be generated. "flat" creates reports you saw above, and "graph" creates reports you can visualize with
-GraphViz. With --output key you can save your report to a file. --strip-unknown and --sorting-method are only usable
-with flat reports. --strip-unknown hides functions profiler does not recognize and --sorting-method selects the
-column (Self or Cumul) according to which rows will be sorted.
+The first two mandatory arguments are what the runtime library creates. The third mandatory argument specifies what
+kind of report will be generated. ```flat``` creates reports you saw above, and ```graph``` creates reports you can
+visualize with GraphViz. ```--strip-unknown``` hides functions profiler does not recognize and
+```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
+flat report.
+
+A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the number of samples when a function was
+on top of the stack. ```Cumul``` means the number of samples when function was on stack regarless to its
+position. ```Self``` is always less or equal to ```Cumul```. ```main``` function usually has the biggest
+```Cumul``` unless there are 'heavy' recursive functions.
