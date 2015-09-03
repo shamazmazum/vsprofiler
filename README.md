@@ -32,9 +32,9 @@ $ LD_PRELOAD=/path/to/libvsprof.so PROF_AUTOSTART=1 program_to_profile
 ```
 
 It will create two files: profX.smpl and profX.map in the current working directory, where X is some number. Then
-run vsanalizer with these two files as arguments (see below what "flat" means):
+run vsanalizer with these two files as arguments:
 ```
-$ /path/to/vsanalizer prof.smpl prof.map flat
+$ /path/to/vsanalizer prof.smpl prof.map
 ```
 
 and get something like this:
@@ -75,14 +75,17 @@ The analizer tool
 The analizer tool can be used as follows:
 
 ```
-vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] prof.smpl prof.map flat|graph
+vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] [--report flat|graph] prof.smpl prof.map
 ```
 
-The first two mandatory arguments are what the runtime library creates. The third mandatory argument specifies what
-kind of report will be generated. ```flat``` creates reports you saw above, and ```graph``` creates reports you can
-visualize with GraphViz. ```--strip-unknown``` hides functions profiler does not recognize and
+The mandatory arguments are what the runtime library creates. Additionly you can use the following arguments:
+
+* ```--report```. Kind of report to be generated. A ```flat``` report is what you already saw above. A ```graph```
+  report is a call graph in format understandable by GraphViz.
+* ```--strip-unknown```. Do not show functions functions profiler does not recognize (like there is no symbol for
+  it in the symbol table).
 ```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
-flat report.
+  flat report.
 
 A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the number of samples when a function was
 on top of the stack. ```Cumul``` means the number of samples when function was on stack regarless to its
