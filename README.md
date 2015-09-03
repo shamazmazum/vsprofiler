@@ -74,9 +74,10 @@ The analizer tool
 
 The analizer tool can be used as follows:
 
-```
-vsanalizer  [--strip-unknown t|nil] [--sorting-method self|cumul] [--report flat|graph] prof.smpl prof.map
-```
+    vsanalizer [--strip-unknown t|nil]
+               [--sorting-method self|cumul]
+               [--report flat|graph]
+               prof.smpl prof.map
 
 The mandatory arguments are what the runtime library creates. Additionly you can use the following arguments:
 
@@ -84,7 +85,7 @@ The mandatory arguments are what the runtime library creates. Additionly you can
   report is a call graph in format understandable by GraphViz.
 * ```--strip-unknown```. Do not show functions functions profiler does not recognize (like there is no symbol for
   it in the symbol table).
-```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
+* ```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
   flat report.
 
 A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the number of samples when a function was
