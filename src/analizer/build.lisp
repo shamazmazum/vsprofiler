@@ -2,18 +2,20 @@
 (load "prereq.lisp")
 
 (defun print-usage ()
-  (format t "Usage: vsanalizer [--sorting-method cumul|self] [--strip-unknown t|nil] [--output filename] prof.smpl prof.map flat|graph~%")
+  (format t "Usage: vsanalizer [--sorting-method cumul|self] [--strip-unknown t|nil] [--report flat|graph] prof.smpl prof.map~%")
 #+clisp (ext:quit 0)
 #+sbcl (sb-ext:quit))
 
 (defun analizer-impl ()
-  (let ((args (apply-argv:parse-argv (apply-argv:get-argv))))
-    (if (or (/= (length (car args)) 3)
-            (> (length (cdr args)) 6))
+  (let ((args (apply-argv:get-argv)))
+    (if (or (< (length (car args)) 2)
+            (> (length (cdr args)) 7))
         (print-usage))
-    (destructuring-bind ((samples-name procmap-name report-type) &rest options)
-        args
+    (destructuring-bind ((samples-name procmap-name &rest invalid) &rest options)
+        (apply-argv:parse-argv args)
+      (if invalid (print-usage))
       (let ((call-graph (vsanalizer:call-graph samples-name procmap-name))
+            (report-func #'vsanalizer:flat-report)
             report-args)
 
         (macrolet ((if-option ((var option) &body body)
@@ -25,15 +27,18 @@
                              ((string-equal sorting-method "cumul") :cumul)
                              (t (error "Wrong sorting method")))
                            report-args)
-                     (push :sorting-method report-args)))
+                     (push :sorting-method report-args))
 
-        (apply (cond
-                 ((string= report-type "flat")  #'vsanalizer:flat-report)
-                 ((string= report-type "graph") #'vsanalizer:graphviz-report)
-                 (t (error "Report type must be 'flat' or 'graph'~%")))
-               (funcall (if (equal (getf options :strip-unknown) "t")
-                            #'vsanalizer:strip-unknown #'identity) call-graph)
-               report-args))))
+          (if-option (report :report)
+                     (setq report-func
+                           (cond
+                             ((string-equal report "flat") #'vsanalizer:flat-report)
+                             ((string-equal report "graph") #'vsanalizer:graphviz-report)
+                             (t (error "Wrong report type")))))
+          (if-option (strip-unknown :strip-unknown)
+                     (setq call-graph (vsanalizer:strip-unknown call-graph))))
+
+        (apply report-func call-graph report-args))))
   #+clisp (ext:quit 0))
 
 #+sbcl
