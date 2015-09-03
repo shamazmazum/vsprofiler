@@ -162,8 +162,9 @@ void prof_init ()
     int res;
     PRINT_VERBOSE (1, "Parsing parameters\n");
     parse_parameters ();
-    PRINT_VERBOSE (1, "max_samples=%i, sample_interval=%li, profile_all=%i save_backtrace=%i verbose=%i\n",
+    PRINT_VERBOSE (1, "MAX_SAMPLES=%i, SAMPLE_INTERVAL=%li, PROF_AUTOSTART=%i PROF_BACKTRACE=%i PROF_VERBOSE=%i\n",
                    max_samples, sample_interval, profile_all, save_backtrace, verbose);
+    PRINT_VERBOSE (1, "Capitalized ones are environment variables\n");
     
     PRINT_VERBOSE (2, "Initializing sample queue\n");
     res = squeue_init (sample_queue);
