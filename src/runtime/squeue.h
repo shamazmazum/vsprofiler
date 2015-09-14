@@ -21,11 +21,11 @@ typedef struct squeue squeue_t;
 
 elem_t squeue_samples (squeue_t*);
 elem_t squeue_entries (squeue_t*);
-int squeue_push_entry (squeue_t*, smpl_t);
+void squeue_push_entry (squeue_t*, smpl_t);
 int squeue_pop_entry  (squeue_t*, smpl_t*);
-int squeue_finalize_sample (squeue_t*);
+void squeue_finalize_sample (squeue_t*);
 
-int  squeue_init (squeue_t*);
+void squeue_init (squeue_t*);
 void squeue_free (squeue_t*);
 
 #endif

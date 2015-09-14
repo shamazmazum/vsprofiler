@@ -47,9 +47,6 @@ static int sucession_flags = 0; // Contains any prombles encountered
 #undef SUPPORTED_PLATFORM
 #endif
 
-#define PUSH(queue,val) if (squeue_push_entry (queue, val)) \
-        PRINT_ERROR ("Cannot push value in queue %p", sample_queue)
-
 #define MAX_STACK_DEPTH 40
 
 // FIXME: machine dependent
@@ -65,7 +62,7 @@ static void backtrace (ucontext_t *context)
             sucession_flags |= TOO_MANY_FRAMES;
             break;
         }
-        PUSH (sample_queue, *(bp+1));
+        squeue_push_entry (sample_queue, *(bp+1));
         bp = (smpl_t*)*bp;
         i++;
     }
@@ -126,12 +123,11 @@ static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *contex
         if (save_backtrace)
         {
             restore_frame_if_needed (context);
-            PUSH (sample_queue, IP(context));
+            squeue_push_entry (sample_queue, IP(context));
             backtrace (context);
         }
-        else PUSH (sample_queue, IP(context));
-        if (squeue_finalize_sample (sample_queue))
-            PRINT_ERROR ("Cannot finalize sample in queue %p\n", sample_queue);
+        else squeue_push_entry (sample_queue, IP(context));
+        squeue_finalize_sample (sample_queue);
     }
 }
 
@@ -159,7 +155,6 @@ int prof_stop ()
 
 void prof_init ()
 {
-    int res;
     PRINT_VERBOSE (1, "Parsing parameters\n");
     parse_parameters ();
     PRINT_VERBOSE (1, "MAX_SAMPLES=%i, SAMPLE_INTERVAL=%li, PROF_AUTOSTART=%i PROF_BACKTRACE=%i PROF_VERBOSE=%i\n",
@@ -167,41 +162,26 @@ void prof_init ()
     PRINT_VERBOSE (1, "Capitalized ones are environment variables\n");
     
     PRINT_VERBOSE (2, "Initializing sample queue\n");
-    res = squeue_init (sample_queue);
-    if (res)
-    {
-        PRINT_ERROR ("Cannot allocate memory for sample queue\n");
-        exit (EXIT_FAILURE);
-    }
-    
+    squeue_init (sample_queue);
+
     PRINT_VERBOSE (2, "Setting interrupt handlers\n");
     struct sigaction sa;
     sa.sa_sigaction = prof_signal_handler;
     sigemptyset (&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
-    res = sigaction (SIGPROF, &sa, NULL);
-    if (res)
-    {
-        PRINT_ERROR ("Cannot set signal handler\n");
-        exit (EXIT_FAILURE);
-    }
+    sigaction (SIGPROF, &sa, NULL);
 
     sa.sa_handler = sigsegv_signal_handler;
     sa.sa_flags = SA_RESETHAND;
     sigemptyset (&sa.sa_mask);
-    res = sigaction (SIGSEGV, &sa, NULL);
-    if (res)
-    {
-        PRINT_ERROR ("Cannot set signal handler\n");
-        exit (EXIT_FAILURE);
-    }
+    sigaction (SIGSEGV, &sa, NULL);
 
     if (profile_all)
     {
         PRINT_VERBOSE (1, "Running timer\n");
         if (prof_start ())
         {
-            PRINT_ERROR ("Cannot start timer\n");
+            perror ("Cannot start timer");
             exit (EXIT_FAILURE);
         }
     }
@@ -209,29 +189,22 @@ void prof_init ()
 
 static int save_samples (FILE *out)
 {
-    int i;
+    int i, res;
     smpl_t ip;
     while (squeue_entries (sample_queue) != 0)
     {
-        if (squeue_pop_entry (sample_queue, &ip))
-        {
-            PRINT_ERROR ("Cannot get value from queue %p\n", sample_queue);
-            return -1;
-        }
-        fprintf (out, "0x%lx%c", ip, (ip == SAMPLE_TERM) ? '\n' : ' ');
+        squeue_pop_entry (sample_queue, &ip);
+        res = fprintf (out, "0x%lx%c", ip, (ip == SAMPLE_TERM) ? '\n' : ' ');
+        if (res < 0) return res;
     }
     return 0;
 }
 
 void prof_end ()
 {
-    int op_res;
+    int res = 0;
     PRINT_VERBOSE (1, "Stopping timer, anyway\n");
-    if (prof_stop ())
-    {
-        PRINT_ERROR ("Cannot stop timer\n");
-        exit (EXIT_FAILURE);
-    }
+    prof_stop ();
 
     char samples[256];
     char procmap[256];
@@ -239,17 +212,17 @@ void prof_end ()
     
     PRINT_VERBOSE (1, "Saving samples in %s\n", samples);
     FILE *out = fopen (samples, "w");
-    op_res = (out == NULL) ? -1 : 0;
-    if (!op_res)
+    if (out != NULL)
     {
-        op_res = op_res || save_samples (out);
+        res = save_samples (out);
         fclose (out);
     }
-    if (op_res) PRINT_ERROR ("Cannot write sample file\n");
+    else res = -1;
+    if (res) PRINT_ERROR ("Cannot write sample file\n");
 
     PRINT_VERBOSE (1, "Saving process map in %s\n", procmap);
-    op_res = copy_file (PROCMAP, procmap);
-    if (op_res) PRINT_ERROR ("Cannot write map file\n");
+    res = copy_file (PROCMAP, procmap);
+    if (res) PRINT_ERROR ("Cannot write map file\n");
 
     PRINT_VERBOSE (2, "Freeing sample queue\n");
     squeue_free (sample_queue);
