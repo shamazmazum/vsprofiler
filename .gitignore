@@ -1,8 +1,9 @@
 src/runtime/*.o
 src/runtime/libvsprof.so
-src/runtime/prof*.map
-src/runtime/prof*.smpl
-src/runtime/tests
-src/runtime/example
+tests/prof*.map
+tests/prof*.smpl
+tests/tests
+tests/example
+tests/libexample.so
 src/analizer/os-name.lisp-expr
 src/analizer/vsanalizer

@@ -21,7 +21,7 @@
     (mapc #'print-total graph)))
 
 (defun run-tests ()
-  (let ((graph (call-graph "../runtime/prof1.smpl" "../runtime/prof1.map")))
+  (let ((graph (call-graph "../../tests/prof1.smpl" "../../tests/prof1.map")))
     (flat-report graph)
     (terpri)
     (test-graph graph)))

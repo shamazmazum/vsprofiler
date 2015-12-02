@@ -30,11 +30,6 @@
           (named-region-start entry)
           (named-region-name entry)))))
 
-#+(or bsd linux)
-(defun libraryp (path)
-  "Is the filename designates a library?"
-  (search ".so" path))
-
 (defun address=>func-name (procmap address &optional (func-table (if (boundp '*func-table*)
                                                                      *func-table* (make-hash-table))))
   "Accepts a process map PROCMAP and an ADDRESS and returns three values:
@@ -47,18 +42,14 @@
     (if known
         (multiple-value-bind (funcs were-scanned)
             (gethash reg-start func-table)
-          (let* ((libraryp (libraryp path))
-                 (funcs (if were-scanned funcs
+          (let* ((funcs (if were-scanned funcs
                             (setf (gethash reg-start func-table)
-                                  (get-funcs (read-elf path)
-                                             :dynamicp libraryp))))
+                                  (get-funcs (read-elf path) reg-start))))
                  (named-function
-                  (find (if libraryp (- address reg-start) address)
-                        funcs :test #'address-inside-p)))
+                  (find address funcs :test #'address-inside-p)))
 
             (if named-function
-                (values (+ (if libraryp reg-start 0)
-                           (named-region-start named-function)) ; Function entry point
+                (values (named-region-start named-function) ; Function entry point
                         path                                    ; Path to object file
                         (named-region-name named-function))     ; Function name
                 (values address path))))

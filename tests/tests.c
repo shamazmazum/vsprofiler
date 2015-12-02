@@ -6,6 +6,7 @@
 #include <stdio.h>
 
 #include "squeue.h"
+int verbose = 2;
 
 #define PROC_SUIT_ERROR do {res = CU_get_error (); \
         printf ("Failed to add a suite\n");        \
