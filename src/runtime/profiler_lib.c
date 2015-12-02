@@ -187,22 +187,20 @@ void prof_init ()
     }
 }
 
-static int save_samples (FILE *out)
+static void save_samples (FILE *out)
 {
-    int i, res;
     smpl_t ip;
     while (squeue_entries (sample_queue) != 0)
     {
         squeue_pop_entry (sample_queue, &ip);
-        res = fprintf (out, "0x%lx%c", ip, (ip == SAMPLE_TERM) ? '\n' : ' ');
-        if (res < 0) return res;
+        if (ip == SAMPLE_TERM) fprintf (out, "\n");
+        else fprintf (out, "0x%lx ", ip);
     }
-    return 0;
 }
 
 void prof_end ()
 {
-    int res = 0;
+    int res;
     PRINT_VERBOSE (1, "Stopping timer, anyway\n");
     prof_stop ();
 
@@ -214,11 +212,10 @@ void prof_end ()
     FILE *out = fopen (samples, "w");
     if (out != NULL)
     {
-        res = save_samples (out);
+        save_samples (out);
         fclose (out);
     }
-    else res = -1;
-    if (res) PRINT_ERROR ("Cannot write sample file\n");
+    else PRINT_ERROR ("Cannot write sample file\n");
 
     PRINT_VERBOSE (1, "Saving process map in %s\n", procmap);
     res = copy_file (PROCMAP, procmap);
