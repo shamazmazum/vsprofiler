@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-uint8_t crc8(uint8_t *buf, ssize_t len);
+uint8_t crc8(uint8_t *buf, size_t len);
 long factor (long n);
 uint8_t get_value(long idx);
 

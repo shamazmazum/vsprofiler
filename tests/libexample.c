@@ -9,7 +9,7 @@
   XorOut: 0x00
 */
 
-uint8_t crc8(uint8_t *buf, ssize_t len)
+uint8_t crc8(uint8_t *buf, size_t len)
 {
     uint8_t crc = 0xFF;
     int i;
