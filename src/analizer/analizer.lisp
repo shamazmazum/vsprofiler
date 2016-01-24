@@ -14,6 +14,8 @@
 (defvar-unbound *func-table*
     "Hash table for parsed elf files")
 
+(defvar *threads* nil)
+
 (defun address-inside-p (address region)
   (declare (type named-region region))
   (and
@@ -93,7 +95,10 @@
                                       subgraph))))))
                    subgraph)))
       (reduce (lambda (subgraph sample)
-                (populate-graph subgraph (reverse sample)))
+                (destructuring-bind (thread-id . sample)
+                    sample
+                  (pushnew thread-id *threads*)
+                  (populate-graph subgraph (reverse sample))))
               samples :initial-value nil))))
 
 (defun strip-unknown (call-graph)

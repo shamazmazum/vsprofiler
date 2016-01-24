@@ -147,5 +147,5 @@
   (with-open-file (in samples-name)
     (loop for line = (read-line in nil)
           while line collect
-          ;; 'The last' on next line is 0x0, so skip it
-          (mapcar #'parse-c-hex (butlast (split-sequence line #\Space))))))
+         (mapcar #'parse-c-hex
+                 (butlast (split-sequence line #\Space))))))

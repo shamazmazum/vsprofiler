@@ -11,10 +11,10 @@ Its pluses:
 * Supports shared libraries
 * It's simple
 * Graphviz understandable output
+* Can profile threaded programs (experimental)
 
 Its minuses:
 ------------
-* No multithreading support
 * Small amount of supported platforms (FreeBSD/DragonFlyBSD/NetBSD on x86-64 machine)
 * Requires Common Lisp implementation for analizer (clisp or sbcl will do) with cl-elf and esrap 
   (sorry, CL is my weakness)

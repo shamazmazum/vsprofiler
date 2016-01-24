@@ -1,19 +1,19 @@
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/ucontext.h>
-#include <sys/param.h>
 #include <signal.h>
+#include <pthread_np.h>
+#include <assert.h>
 
 #include <stdlib.h>
 
+#include "samples.h"
 #include "profiler_lib.h"
 #include "profiler_lib_util.h"
 #include "verbose.h"
 
-// Sample queue
-static squeue_t sample_queue_;
-static squeue_t *sample_queue = &sample_queue_;
 // Parameters shadowed by environment variables
-elem_t max_samples = 10000;
+size_t max_samples = 10000;
 suseconds_t sample_interval = 1000; // usec
 int profile_all = 0; // Start profiling timer implicitly
 int save_backtrace = 0; // Save content of the stack too (experimental)
@@ -47,23 +47,22 @@ static int sucession_flags = 0; // Contains any prombles encountered
 #undef SUPPORTED_PLATFORM
 #endif
 
-#define MAX_STACK_DEPTH 40
-
 // FIXME: machine dependent
-static void backtrace (ucontext_t *context)
+static void backtrace (ucontext_t *context, uintptr_t sample[])
 {
     inside_backtrace = 1;
-    smpl_t *bp = (smpl_t*)BP(context);
-    int i = 0;
+    uintptr_t *bp = (uintptr_t*)BP(context);
+    int i = 2;
     while (bp)
     {
-        if (i == MAX_STACK_DEPTH)
+        if (i == STACK_DEPTH-1)
         {
             sucession_flags |= TOO_MANY_FRAMES;
+            sample[i] = 0x0;
             break;
         }
-        squeue_push_entry (sample_queue, *(bp+1));
-        bp = (smpl_t*)*bp;
+        sample[i] = *(bp+1);
+        bp = (uintptr_t*)*bp;
         i++;
     }
     inside_backtrace = 0;
@@ -85,8 +84,8 @@ static void restore_frame_if_needed (ucontext_t *context)
     {
         IP(context)++;
         ip = (void*)IP(context);
-        SP(context) -= sizeof(smpl_t);
-        *((smpl_t*)SP(context)) = BP(context);
+        SP(context) -= sizeof(uintptr_t);
+        *((uintptr_t*)SP(context)) = BP(context);
     }
     if ((*ip == 0x48) && (*(ip+1) == 0x89) && (*(ip+2) == 0xe5)) /* mov %rsp,%rbp */
     {
@@ -96,8 +95,8 @@ static void restore_frame_if_needed (ucontext_t *context)
     }
     else if (*ip == 0xc3) /* retq */
     {
-        IP(context) = *((smpl_t*)SP(context));
-        SP(context) += sizeof(smpl_t);
+        IP(context) = *((uintptr_t*)SP(context));
+        SP(context) += sizeof(uintptr_t);
         frames_restored++;
     }
 }
@@ -118,16 +117,13 @@ static void sigsegv_signal_handler (int signal)
 
 static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *context)
 {
-    if (squeue_samples (sample_queue) < max_samples)
+    uintptr_t *sample = allocate_sample ();
+    if (sample != NULL)
     {
-        if (save_backtrace)
-        {
-            restore_frame_if_needed (context);
-            squeue_push_entry (sample_queue, IP(context));
-            backtrace (context);
-        }
-        else squeue_push_entry (sample_queue, IP(context));
-        squeue_finalize_sample (sample_queue);
+        if (save_backtrace) restore_frame_if_needed (context);
+        sample[0] = pthread_getthreadid_np ();
+        sample[1] = IP(context);
+        if (save_backtrace) backtrace (context, sample);
     }
 }
 
@@ -157,12 +153,14 @@ void prof_init ()
 {
     PRINT_VERBOSE (1, "Parsing parameters\n");
     parse_parameters ();
-    PRINT_VERBOSE (1, "MAX_SAMPLES=%i, SAMPLE_INTERVAL=%li, PROF_AUTOSTART=%i PROF_BACKTRACE=%i PROF_VERBOSE=%i\n",
+    PRINT_VERBOSE (1,
+                   "MAX_SAMPLES=%lu, SAMPLE_INTERVAL=%li, PROF_AUTOSTART=%i "
+                   "PROF_BACKTRACE=%i PROF_VERBOSE=%i\n",
                    max_samples, sample_interval, profile_all, save_backtrace, verbose);
     PRINT_VERBOSE (1, "Capitalized ones are environment variables\n");
     
-    PRINT_VERBOSE (2, "Initializing sample queue\n");
-    squeue_init (sample_queue);
+    PRINT_VERBOSE (2, "Initializing sample array\n");
+    init_sample_array ();
 
     PRINT_VERBOSE (2, "Setting interrupt handlers\n");
     struct sigaction sa;
@@ -189,12 +187,24 @@ void prof_init ()
 
 static void save_samples (FILE *out)
 {
-    smpl_t ip;
-    while (squeue_entries (sample_queue) != 0)
+    uintptr_t ip;
+    int i,j;
+    uintptr_t *sample;
+
+    i = 0;
+    while ((i < max_samples) &&
+           ((sample = get_sample(i)) != NULL) &&
+           (sample[0] != 0x0))
     {
-        squeue_pop_entry (sample_queue, &ip);
-        if (ip == SAMPLE_TERM) fprintf (out, "\n");
-        else fprintf (out, "0x%lx ", ip);
+        j = 0;
+        while (sample[j] != 0x0)
+        {
+            fprintf (out, "0x%lx ", sample[j]);
+            j++;
+        }
+        fprintf (out, "\n");
+        assert (j != STACK_DEPTH);
+        i++;
     }
 }
 
@@ -204,8 +214,8 @@ void prof_end ()
     PRINT_VERBOSE (1, "Stopping timer, anyway\n");
     prof_stop ();
 
-    char samples[256];
-    char procmap[256];
+    char samples[MAXPATHLEN];
+    char procmap[MAXPATHLEN];
     get_output_names (samples, procmap);
     
     PRINT_VERBOSE (1, "Saving samples in %s\n", samples);
@@ -222,10 +232,12 @@ void prof_end ()
     if (res) PRINT_ERROR ("Cannot write map file\n");
 
     PRINT_VERBOSE (2, "Freeing sample queue\n");
-    squeue_free (sample_queue);
+    destroy_sample_array ();
 
     if (save_backtrace)
         PRINT_VERBOSE (2, "%i stack frames was restored during execution\n", frames_restored);
     if (sucession_flags & TOO_MANY_FRAMES)
-        PRINT_VERBOSE (2, "Control stack is too large or unsupported optimizations were used\n");
+        PRINT_VERBOSE (1,
+                       "Control stack is too large or unsupported optimizations\n"
+                       "were used. Backtrace may be incomplete or corrupt.\n");
 }

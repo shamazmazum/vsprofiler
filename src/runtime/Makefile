@@ -1,4 +1,4 @@
-SRCS = squeue.c profiler_lib.c profiler_lib_util.c
+SRCS = samples.c profiler_lib.c profiler_lib_util.c
 OBJS = $(SRCS:.c=.o)
 TARGET = libvsprof.so
 
@@ -11,7 +11,7 @@ all: $(TARGET)
 	$(CC) -c -fPIC $(CFLAGS) -o $@ $^
 
 $(TARGET): $(OBJS)
-	$(CC) $(LFLAGS) -shared -o $@ $^
+	$(CC) $(LFLAGS) -shared -lpthread -o $@ $^
 
 clean:
 	rm -f $(TARGET) *.o tests example prof*.map prof*.smpl

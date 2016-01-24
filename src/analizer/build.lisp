@@ -39,6 +39,7 @@
                      (setq call-graph (vsanalizer:strip-unknown call-graph))))
 
         (apply report-func call-graph report-args))))
+  (format t "Thread profiled ~d~%" (length vsanalizer:*threads*))
   #+clisp (ext:quit 0))
 
 #+sbcl

@@ -4,8 +4,6 @@ set -e
 
 PROF_LIB=../src/runtime/libvsprof.so
 
-./tests
-
 rm -f prof0.smpl prof0.map
 echo "Running profiler without saving backtrace..."
 LD_LIBRARY_PATH=. LD_PRELOAD=$PROF_LIB PROF_AUTOSTART=1 PROF_VERBOSE=2 ./example

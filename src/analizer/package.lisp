@@ -8,4 +8,6 @@
            #:graph-node-self
            #:graph-node-cumul
            #:graph-node-fn-name
-           #:graph-node-obj-name))
+           #:graph-node-obj-name
+
+           #:*threads*))
