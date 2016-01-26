@@ -2,6 +2,8 @@
 
 (defparameter *unknown-function-name* "<Unknown function>"
   "Bogus name of an unknown function")
+(defparameter *unknown-id* 0
+  "ID of unknown function")
 
 ;; Just in case...
 (defmacro defvar-unbound (var-name &optional documentation)
@@ -76,9 +78,11 @@
                          (callee-samples (cdr sample)))
                      (multiple-value-bind (caller-id caller-obj-name caller-name)
                          (address=>func-name procmap caller-sample)
+                       (if (not caller-name) (setq caller-id *unknown-id*))
 
-                       (let ((caller-subtree (find caller-id subgraph :key (lambda (subtree)
-                                                                                   (graph-node-id (car subtree))))))
+                       (let ((caller-subtree (find caller-id subgraph
+                                                   :key (lambda (subtree)
+                                                          (graph-node-id (car subtree))))))
                                (if caller-subtree
                                    (let ((caller (car caller-subtree)))
                                      (incf (graph-node-cumul caller))
@@ -106,7 +110,7 @@
   (labels ((collect-known (known subtree)
              (let ((caller  (car subtree))
                    (callees (strip-unknown (cdr subtree))))
-               (if (graph-node-fn-name caller)
+               (if (/= (graph-node-id caller) *unknown-id*)
                    (cons (cons caller callees) known)
                    (append callees known)))))
     (if call-graph
@@ -174,4 +178,5 @@
     (write-string "ROOT[shape=\"rectangle\"]" stream)
     (terpri stream)
     (print-callees :root call-graph))
-  (format stream "}~%"))
+  (format stream "}~%")
+  t)
