@@ -19,9 +19,9 @@ int profile_all = 0; // Start profiling timer implicitly
 int save_backtrace = 0; // Save content of the stack too (experimental)
 int verbose = 1;
 // Other
-static int inside_backtrace = 0; // Is control inside function backtrace()?
-static int frames_restored = 0; // Number of restored stack frames
-static int sucession_flags = 0; // Contains any prombles encountered
+static volatile sig_atomic_t frames_restored = 0; // Number of restored stack frames
+static volatile sig_atomic_t sucession_flags = 0; // Contains any prombles encountered
+static int running = 0;
 
 #define TOO_MANY_FRAMES  0x01
 
@@ -50,7 +50,6 @@ static int sucession_flags = 0; // Contains any prombles encountered
 // FIXME: machine dependent
 static void backtrace (ucontext_t *context, uintptr_t sample[])
 {
-    inside_backtrace = 1;
     uintptr_t *bp = (uintptr_t*)BP(context);
     int i = 2;
     while (bp)
@@ -65,7 +64,6 @@ static void backtrace (ucontext_t *context, uintptr_t sample[])
         bp = (uintptr_t*)*bp;
         i++;
     }
-    inside_backtrace = 0;
 }
 
 static void restore_frame_if_needed (ucontext_t *context)
@@ -101,20 +99,6 @@ static void restore_frame_if_needed (ucontext_t *context)
     }
 }
 
-// FIXME: what if running program will replace this handler by its own?
-// Can it be fixed?
-static void sigsegv_signal_handler (int signal)
-{
-    if (inside_backtrace)
-    {
-        PRINT_ERROR ("\n--------------------\n");
-        PRINT_ERROR ("Segmentation fault while saving backtrace!\n");
-        PRINT_ERROR ("This error can mean what your program was build with unsupported optimization\n");
-        PRINT_ERROR ("flags (like -fomit-frame-pointer). Try to run profiler without PROF_BACKTRACE\n");
-        PRINT_ERROR ("\n--------------------\n");
-    }
-}
-
 static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *context)
 {
     uintptr_t *sample = allocate_sample ();
@@ -130,23 +114,35 @@ static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *contex
 int prof_start ()
 {
     struct itimerval val;
-    val.it_interval.tv_sec  = 0;
-    val.it_interval.tv_usec = sample_interval;
-    val.it_value.tv_sec  = 0;
-    val.it_value.tv_usec = sample_interval;
+    int res = -1;
 
-    return setitimer (ITIMER_PROF, &val, NULL);
+    if (__sync_lock_test_and_set (&running, 1) == 0)
+    {
+        val.it_interval.tv_sec  = 0;
+        val.it_interval.tv_usec = sample_interval;
+        val.it_value.tv_sec  = 0;
+        val.it_value.tv_usec = sample_interval;
+
+        res = setitimer (ITIMER_PROF, &val, NULL);
+    }
+    return res;
 }
 
 int prof_stop ()
 {
     struct itimerval val;
-    val.it_interval.tv_sec  = 0;
-    val.it_interval.tv_usec = 0;
-    val.it_value.tv_sec  = 0;
-    val.it_value.tv_usec = 0;
+    int res = -1;
 
-    return setitimer (ITIMER_PROF, &val, NULL);
+    if (__sync_lock_test_and_set (&running, 0) == 1)
+    {
+        val.it_interval.tv_sec  = 0;
+        val.it_interval.tv_usec = 0;
+        val.it_value.tv_sec  = 0;
+        val.it_value.tv_usec = 0;
+
+        res = setitimer (ITIMER_PROF, &val, NULL);
+    }
+    return res;
 }
 
 void prof_init ()
@@ -168,11 +164,6 @@ void prof_init ()
     sigemptyset (&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
     sigaction (SIGPROF, &sa, NULL);
-
-    sa.sa_handler = sigsegv_signal_handler;
-    sa.sa_flags = SA_RESETHAND;
-    sigemptyset (&sa.sa_mask);
-    sigaction (SIGSEGV, &sa, NULL);
 
     if (profile_all)
     {
@@ -235,7 +226,7 @@ void prof_end ()
     destroy_sample_array ();
 
     if (save_backtrace)
-        PRINT_VERBOSE (2, "%i stack frames was restored during execution\n", frames_restored);
+        PRINT_VERBOSE (2, "%li stack frames was restored during execution\n", frames_restored);
     if (sucession_flags & TOO_MANY_FRAMES)
         PRINT_VERBOSE (1,
                        "Control stack is too large or unsupported optimizations\n"
