@@ -1,4 +1,4 @@
-PROF_1.0 {
+PROF_@vsprofiler_VERSION@ {
     global: prof_start;
             prof_stop;
     local: *;

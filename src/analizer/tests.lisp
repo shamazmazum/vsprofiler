@@ -1,7 +1,6 @@
-(load "prereq.lisp")
-
 (defpackage vsanalizer-test
-  (:use #:cl #:vsanalizer))
+  (:use #:cl #:vsanalizer)
+  (:export #:run-tests))
 (in-package :vsanalizer-test)
 
 (defun test-graph (graph)
@@ -20,12 +19,7 @@
                (mapc #'print-total (cdr node)))))
     (mapc #'print-total graph)))
 
-(defun run-tests ()
-  (let ((graph (call-graph "../../tests/prof1.smpl" "../../tests/prof1.map")))
-    (flat-report graph)
-    (terpri)
-    (test-graph graph)))
-
-(run-tests)
-#+clisp
-(ext:quit 0)
+(defun run-tests (graph &key &allow-other-keys)
+  (test-graph graph)
+  (terpri)
+  (flat-report graph))

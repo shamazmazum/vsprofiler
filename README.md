@@ -23,8 +23,15 @@ Its minuses:
 How to build/use:
 ----------------
 
-Run (g)make from this directory. It will build src/runtime/libvsprof.so runtime library and src/analizer/vsanalizer
- program which is an analizer tool.
+Run the following:
+
+    mkdir build
+    cd build
+    cmake -DLISP_IMPL=your_lisp_implementation ..
+    make
+
+It will build src/runtime/libvsprof.so runtime library and src/analizer/vsanalizer program which is an analizer
+tool. The lisp implementation defaults to SBCL.
 
 Now you can run your program with the profiler by preloading the library:
 ```
@@ -49,7 +56,7 @@ and get something like this:
 ```
 
 Another way to use the profiler is to link against libvsprof.so in build time and use
-prof_start() and prof_stop() functions (declared in profiler_lib.h) to start and stop
+prof_start() and prof_stop() functions (declared in vsprof.h) to start and stop
 profiler explicitly.
 
 The runtime library

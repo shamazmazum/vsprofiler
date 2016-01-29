@@ -116,6 +116,7 @@
     (if call-graph
         (reduce #'collect-known call-graph :initial-value nil))))
 
+;; Destructively modifies graph nodes
 (defun flat-report (call-graph &key (sorting-method :self)
                                  (stream *standard-output*) &allow-other-keys)
   "Prints a flat report. SORTING-METHOD may be :SELF or :CUMUL

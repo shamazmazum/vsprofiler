@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "profiler_lib.h"
-#include "profiler_lib_util.h"
+#include "vsprof.h"
+#include "profiler_util.h"
 #include "verbose.h"
 
 extern char **environ;

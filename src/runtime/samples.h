@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define STACK_DEPTH 16
+#define STACK_DEPTH 24
 extern uintptr_t (*samples)[STACK_DEPTH];
 
 uintptr_t* allocate_sample ();

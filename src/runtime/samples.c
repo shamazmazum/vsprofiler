@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include "samples.h"
-#include "profiler_lib.h"
+#include "vsprof.h"
 #include "verbose.h"
 
 uintptr_t (*samples)[STACK_DEPTH];

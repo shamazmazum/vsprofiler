@@ -1,5 +1,22 @@
 ;; Tool for building analizer
-(load "prereq.lisp")
+(with-open-file (in "os-name.lisp-expr")
+  (loop for os-feature = (read in nil)
+        while os-feature
+        do
+        (pushnew os-feature *features*)))
+
+(require 'asdf)
+(asdf:load-system :elf)
+(asdf:load-system :esrap)
+(asdf:load-system :apply-argv)
+
+(load "package.lisp")
+(load "input-parser.lisp")
+(load "symbol-table.lisp") ; Depends on named-region
+(load "analizer.lisp") ; Must be the last for analizer
+(load "tests.lisp") ; Finally, the tests
+
+(defparameter +name+ "vsanalizer.bin")
 
 (defun print-usage ()
   (format t "Usage: vsanalizer [--sorting-method cumul|self] [--strip-unknown t|nil] [--report flat|graph] prof.smpl prof.map~%")
@@ -34,6 +51,7 @@
                            (cond
                              ((string-equal report "flat") #'vsanalizer:flat-report)
                              ((string-equal report "graph") #'vsanalizer:graphviz-report)
+                             ((string-equal report "test") #'vsanalizer-test:run-tests)
                              (t (error "Wrong report type")))))
           (if-option (strip-unknown :strip-unknown)
                      (setq call-graph (vsanalizer:strip-unknown call-graph))))
@@ -44,13 +62,13 @@
 
 #+sbcl
 (defun make-image ()
-  (sb-ext:save-lisp-and-die "vsanalizer"
+  (sb-ext:save-lisp-and-die +name+
                             :executable t
                             :toplevel #'analizer-impl))
 
 #+clisp
 (defun make-image ()
-  (ext:saveinitmem "vsanalizer"
+  (ext:saveinitmem +name+
                    :executable t
                    :norc t
                    :quiet t
