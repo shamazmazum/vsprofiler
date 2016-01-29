@@ -55,7 +55,7 @@ profiler explicitly.
 The runtime library
 ------------------
 The runtime library, named libvsprof.so is what you need to link to a program you want to profile. As mentioned
-above, it can be done either in build time or with LD_PRELOAD environment variable. The libarary understands
+above, it can be done either in build time or with LD_PRELOAD environment variable. The library understands
 following additional environment variables:
 
 * ```MAX_SAMPLES``` is used to specify maximum limit of samples. Defaults to 10000
@@ -83,7 +83,7 @@ The mandatory arguments are what the runtime library creates. Additionly you can
 
 * ```--report```. Kind of report to be generated. A ```flat``` report is what you already saw above. A ```graph```
   report is a call graph in format understandable by GraphViz.
-* ```--strip-unknown```. Do not show functions functions profiler does not recognize (like there is no symbol for
+* ```--strip-unknown```. Do not show functions profiler does not recognize (like there is no symbol for
   it in the symbol table).
 * ```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
   flat report.
@@ -92,6 +92,19 @@ A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the num
 on top of the stack. ```Cumul``` means the number of samples when function was on stack regarless to its
 position. ```Self``` is always less or equal to ```Cumul```. ```main``` function usually has the biggest
 ```Cumul``` unless there are 'heavy' recursive functions.
+
+Debug messages
+--------------
+
+You may see the following message if your verbosity level is greater or equal to 1.
+
+    Control stack is too large or unsupported optimizations
+    were used. Backtrace may be incomplete or corrupt.
+
+To fix this try to set STACK_DEPTH in src/runtime/samples.h to 24 (or any other multiple of 8 greater than 16). I plan
+to add an environment variable for this later.
+
+Also you will see error messages if sample or map file cannot be saved in current directory.
 
 How to port
 -----------
