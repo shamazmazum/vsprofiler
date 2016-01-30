@@ -11,15 +11,10 @@
   "Returns postion of .text section in section header table"
   (position ".text" (sections elf-obj) :key #'name :test #'string=))
 
-(defun get-funcs (elf-obj &optional (base 0))
-  "Returns a list of functions (as named regions) from ELF-OBJ."
-  (let* ((dynamicp (eq :shared-object (elf:type (header elf-obj))))
-         (string-table-name (if dynamicp ".dynstr" ".strtab"))
-         (symbol-table-name (if dynamicp ".dynsym" ".symtab"))
-         (string-table (named-section elf-obj string-table-name))
-         (symbol-table (named-section elf-obj symbol-table-name))
-         (base (if dynamicp base 0))
-         (text-section-idx (text-section-idx elf-obj)))
+(defun get-funcs-from-section (elf-obj symbol-table-name string-table-name base)
+  (let ((string-table (named-section elf-obj string-table-name))
+        (symbol-table (named-section elf-obj symbol-table-name))
+        (text-section-idx (text-section-idx elf-obj)))
     (if (and string-table
              symbol-table)
         (flet ((cons-entry (sym)
@@ -32,3 +27,13 @@
                   (eq (elf:type sym) :func))))
 
           (mapcar #'cons-entry (remove-if-not #'present-function-p (data symbol-table)))))))
+
+
+(defun get-funcs (elf-obj &optional (base 0))
+  "Returns a list of functions (as named regions) from ELF-OBJ."
+  (let* ((dynamicp (eq :shared-object (elf:type (header elf-obj))))
+         (base (if dynamicp base 0))
+         (functions (get-funcs-from-section elf-obj ".symtab" ".strtab" base)))
+    (if dynamicp (union functions
+                        (get-funcs-from-section elf-obj ".dynsym" ".dynstr" base))
+        functions)))
