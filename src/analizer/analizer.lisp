@@ -53,11 +53,11 @@
                   (find address funcs :test #'address-inside-p)))
 
             (if named-function
-                (values (named-region-start named-function) ; Function entry point
-                        path                                    ; Path to object file
-                        (named-region-name named-function))     ; Function name
-                (values address path))))
-        address)))
+                (return-from address=>func-name
+                  (values (named-region-start named-function)           ; Function entry point
+                          path                                          ; Path to object file
+                          (named-region-name named-function))))))))     ; Function name
+  *unknown-id*)
 
 (defstruct graph-node
   "A node of call graph"
@@ -78,7 +78,6 @@
                          (callee-samples (cdr sample)))
                      (multiple-value-bind (caller-id caller-obj-name caller-name)
                          (address=>func-name procmap caller-sample)
-                       (if (not caller-name) (setq caller-id *unknown-id*))
 
                        (let ((caller-subtree (find caller-id subgraph
                                                    :key (lambda (subtree)
