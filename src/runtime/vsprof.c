@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <pthread_np.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <stdlib.h>
 
@@ -105,7 +106,14 @@ static void prof_signal_handler (int signal, siginfo_t *info, ucontext_t *contex
     if (sample != NULL)
     {
         if (save_backtrace) restore_frame_if_needed (context);
-        sample[0] = pthread_getthreadid_np ();
+        sample[0] =
+#if defined(__FreeBSD__)
+            pthread_getthreadid_np ();
+#elif defined(__DragonFly__)
+            lwp_gettid () + 1;
+#else
+            1;
+#endif
         sample[1] = IP(context);
         if (save_backtrace) backtrace (context, sample);
     }

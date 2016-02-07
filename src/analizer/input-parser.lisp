@@ -35,7 +35,7 @@
 #+freebsd
 (defrule obj-type (or "default" "vnode" "swap" "device" "none"))
 #+dragonfly
-(defrule obj-type (or "default" "vnode" "swap" "device" "mgtdevice" "none"))
+(defrule obj-type (or "default" "vnode" "swap" "device" "mgtdevice" "uksmap" "none"))
 
 ;; FIXME: any better ideas how to parse paths?
 (defun allowed-in-path (char)
