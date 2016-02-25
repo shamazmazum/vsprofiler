@@ -8,7 +8,6 @@
 (require 'asdf)
 (asdf:load-system :elf)
 (asdf:load-system :esrap)
-(asdf:load-system :apply-argv)
 
 (load "package.lisp")
 (load "input-parser.lisp")
@@ -16,49 +15,106 @@
 (load "analizer.lisp") ; Must be the last for analizer
 (load "tests.lisp") ; Finally, the tests
 
+(defpackage vsanalizer-builder
+  (:use :cl :vsanalizer))
+(in-package :vsanalizer-builder)
+
 (defparameter +name+ "vsanalizer.bin")
 
+(defun get-argv ()
+  #+sbcl (cdr sb-ext:*posix-argv*)
+  #-sbcl (error "GET-ARGV is not implemented"))
+
+(defun parse-argv (args spec)
+  (let ((option-specs
+         (mapcar (lambda (spec)
+                   (concatenate 'string "--"
+                                (string-downcase (symbol-name (car spec)))))
+                 spec))
+        parameters options optional-parameters)
+    (loop for arg = (pop args)
+          while arg do
+         (let ((spec-pos (position arg option-specs :test #'string=)))
+           (if spec-pos
+               ;; This is an option
+               (let ((spec (nth spec-pos spec)))
+                 (destructuring-bind (option . argp) spec
+                   (if argp ; Additional argument is required
+                       (progn
+                         (push (pop args) optional-parameters)
+                         (push option optional-parameters))
+                       (push option options))))
+               (push arg parameters))))
+    (values options optional-parameters (reverse parameters))))
+
 (defun print-usage ()
-  (format t "Usage: vsanalizer [--sorting-method cumul|self] [--strip-unknown t|nil] [--report flat|graph] prof.smpl prof.map~%")
-#+clisp (ext:quit 0)
-#+sbcl (sb-ext:quit))
+  (format t "Usage:~%")
+  (format t "vsanalizer flat [--sorting-method cumul|self] [--strip-unknown] prof.smpl prof.map~%")
+  (format t "vsanalizer graph [--strip-unknown] prof.smpl prof.map~%")
+  (format t "vsanalizer histogram <func-name> prof.smpl prof.map~%")
+
+  #+clisp (ext:quit 0)
+  #+sbcl (sb-ext:exit))
+
+(defun do-histogram-report (args)
+  (multiple-value-bind (options optional-parameters parameters)
+      (parse-argv args nil)
+    (if (or options optional-parameters
+            (/= (length parameters) 3))
+        (print-usage))
+    (histogram-report (second parameters)
+                      (third parameters)
+                      (first parameters))
+    #+clisp (ext:quit 0)))
+
+(defun do-flat-report (args)
+  (multiple-value-bind (options optional-parameters parameters)
+      (parse-argv args '((:sorting-method . t)
+                         (:strip-unknown . nil)))
+    (let ((sorting-method
+           (let ((sorting-method-string (getf optional-parameters :sorting-method)))
+             (if sorting-method-string
+                 (intern
+                  (string-upcase sorting-method-string)
+                  (find-package :keyword))
+                 :self))))
+      (if (or (/= (length parameters) 2)
+              (not (member sorting-method '(:cumul :self))))
+          (print-usage))
+      (let ((graph (call-graph
+                    (first parameters)
+                    (second parameters))))
+        (if (member :strip-unknown options)
+            (setq graph (strip-unknown graph)))
+        (flat-report graph :sorting-method sorting-method))))
+  (format t "Thread profiled ~d~%" (length *threads*))
+  #+clisp (ext:quit 0))
+
+(defun do-graph-report (args)
+  (multiple-value-bind (options optional-parameters parameters)
+      (parse-argv args '((:strip-unknown . nil)))
+    (if (or (/= (length parameters) 2)
+            optional-parameters)
+        (print-usage))
+    (let ((graph (call-graph
+                  (first parameters)
+                  (second parameters))))
+      (if (member :strip-unknown options)
+          (setq graph (strip-unknown graph)))
+      (graphviz-report graph)))
+  #+clisp (ext:quit 0))
 
 (defun analizer-impl ()
-  (let ((args (apply-argv:get-argv)))
-    (if (or (< (length (car args)) 2)
-            (> (length (cdr args)) 7))
-        (print-usage))
-    (destructuring-bind ((samples-name procmap-name &rest invalid) &rest options)
-        (apply-argv:parse-argv args)
-      (if invalid (print-usage))
-      (let ((call-graph (vsanalizer:call-graph samples-name procmap-name))
-            (report-func #'vsanalizer:flat-report)
-            report-args)
-
-        (macrolet ((if-option ((var option) &body body)
-                     `(let ((,var (getf options ,option)))
-                        (if ,var (progn ,@body)))))
-          (if-option (sorting-method :sorting-method)
-                     (push (cond
-                             ((string-equal sorting-method "self") :self)
-                             ((string-equal sorting-method "cumul") :cumul)
-                             (t (error "Wrong sorting method")))
-                           report-args)
-                     (push :sorting-method report-args))
-
-          (if-option (report :report)
-                     (setq report-func
-                           (cond
-                             ((string-equal report "flat") #'vsanalizer:flat-report)
-                             ((string-equal report "graph") #'vsanalizer:graphviz-report)
-                             ((string-equal report "test") #'vsanalizer-test:run-tests)
-                             (t (error "Wrong report type")))))
-          (if-option (strip-unknown :strip-unknown)
-                     (setq call-graph (vsanalizer:strip-unknown call-graph))))
-
-        (apply report-func call-graph report-args))))
-  (format t "Thread profiled ~d~%" (length vsanalizer:*threads*))
-  #+clisp (ext:quit 0))
+  (let ((command (car (get-argv)))
+        (args (cdr (get-argv))))
+    (cond
+      ((string= command "flat")
+       (do-flat-report args))
+      ((string= command "graph")
+       (do-graph-report args))
+      ((string= command "histogram")
+       (do-histogram-report args))
+      (t (print-usage)))))
 
 #+sbcl
 (defun make-image ()

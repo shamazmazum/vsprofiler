@@ -41,7 +41,7 @@ $ LD_PRELOAD=/path/to/libvsprof.so PROF_AUTOSTART=1 program_to_profile
 It will create two files: profX.smpl and profX.map in the current working directory, where X is some number. Then
 run vsanalizer with these two files as arguments:
 ```
-$ /path/to/vsanalizer prof.smpl prof.map
+$ /path/to/vsanalizer flat prof.smpl prof.map
 ```
 
 and get something like this:
@@ -81,15 +81,14 @@ The analizer tool
 
 The analizer tool can be used as follows:
 
-    vsanalizer [--strip-unknown t|nil]
-               [--sorting-method self|cumul]
-               [--report flat|graph]
-               prof.smpl prof.map
+    vsanalizer flat [--sorting-method cumul|self] [--strip-unknown] prof.smpl prof.map
+    vsanalizer graph [--strip-unknown] prof.smpl prof.map
+    vsanalizer histogram <func-name> prof.smpl prof.map
 
-The mandatory arguments are what the runtime library creates. Additionly you can use the following arguments:
+The first mandatory argument is a type of report being produced, prof.smpl and prof.map are what the
+runtime library creates. Report types can be ```flat```, ```graph``` or ```histogram```. Additionly
+you can use the following arguments:
 
-* ```--report```. Kind of report to be generated. A ```flat``` report is what you already saw above. A ```graph```
-  report is a call graph in format understandable by GraphViz.
 * ```--strip-unknown```. Do not show functions profiler does not recognize (like there is no symbol for
   it in the symbol table).
 * ```--sorting-method``` selects the column (```Self``` or ```Cumul```) according to which rows will be sorted in the
@@ -99,6 +98,11 @@ A note on what exactly ```Self``` and ```Cumul``` mean. ```Self``` means the num
 on top of the stack. ```Cumul``` means the number of samples when function was on stack regarless to its
 position. ```Self``` is always less or equal to ```Cumul```. ```main``` function usually has the biggest
 ```Cumul``` unless there are 'heavy' recursive functions.
+
+A word or two on report types: ```flat``` report is what you saw above, ```graph``` report prints a
+call graph in format understandable by GraphViz, ```histogram``` works with a particular function
+and prints for each instruction address the number of samples for which this address were stored in
+instruction pointer.
 
 Debug messages
 --------------

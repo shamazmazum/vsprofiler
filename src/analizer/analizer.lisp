@@ -34,8 +34,8 @@
           (named-region-start entry)
           (named-region-name entry)))))
 
-(defun address=>func-name (procmap address &optional (func-table (if (boundp '*func-table*)
-                                                                     *func-table* (make-hash-table))))
+(defun address=>func-name (procmap address &aux (func-table (if (boundp '*func-table*)
+                                                                *func-table* (make-hash-table))))
   "Accepts a process map PROCMAP and an ADDRESS and returns three values:
    1) a begining of the function the ADDRESS belongs to (or just the ADDRESS
    if function is not present in symbol table)
@@ -117,7 +117,7 @@
 
 ;; Destructively modifies graph nodes
 (defun flat-report (call-graph &key (sorting-method :self)
-                                 (stream *standard-output*) &allow-other-keys)
+                                 (stream *standard-output*))
   "Prints a flat report. SORTING-METHOD may be :SELF or :CUMUL
    and determines according to which slot in a GRAPH-NODE struct
    an entry will be sorted."
@@ -156,7 +156,7 @@
                          ((eq :self  sorting-method) #'graph-node-self))))))
   t)
 
-(defun graphviz-report (call-graph &key (stream *standard-output*) &allow-other-keys)
+(defun graphviz-report (call-graph &key (stream *standard-output*))
   "Prints a report in DOT langauge understandable by graphviz."
   (format stream "digraph call_graph {~%")
   (labels ((print-callees (caller-sym callees)
@@ -180,3 +180,27 @@
     (print-callees :root call-graph))
   (format stream "}~%")
   t)
+
+(defun histogram-report (samples-name procmap-name report-func
+                         &key (stream *standard-output*))
+  "Print a report in form of histogram for a particular function"
+  (let ((samples (read-samples samples-name))
+        (procmap (read-procmap procmap-name))
+        (hist-hash (make-hash-table))
+        (*func-table* (make-hash-table))
+        hist)
+    (flet ((process-sample (sample)
+             (multiple-value-bind (func-addr obj-name func-name)
+                 (address=>func-name procmap sample)
+               (declare (ignore func-addr obj-name)) ; XXX: What if obj-name differs?
+               (if (string= func-name report-func)
+                   (incf (gethash sample hist-hash 0))))))
+      ;; First is the thread ID, second is an address in %rip
+      (mapc (lambda (sample) (process-sample (second sample))) samples))
+    (maphash (lambda (key value) (push (cons key value) hist)) hist-hash)
+    (setq hist (sort hist #'< :key #'car))
+    (format stream "  Address          Count~%")
+    (dolist (entry hist)
+      (destructuring-bind (address . count) entry
+        (format stream "0x~6x          ~d~%" address count)))
+    t))
