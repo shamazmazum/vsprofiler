@@ -1,17 +1,19 @@
 cmake_minimum_required (VERSION 2.6)
 
 set (LISP_IMPL sbcl --script CACHE STRING "Lisp implementation")
+file (GLOB LISP_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.lisp)
 
-add_custom_target (analizer ALL
-                   DEPENDS vsanalizer)
-add_custom_command (OUTPUT vsanalizer.bin
+foreach (SOURCE ${LISP_SOURCES})
+    configure_file (${SOURCE} ${CMAKE_CURRENT_BINARY_DIR}/${SOURCE})
+endforeach (SOURCE)
+configure_file (os-name.sh ${CMAKE_CURRENT_BINARY_DIR}/os-name.sh)
+
+add_custom_command (OUTPUT vsanalizer
                     COMMAND sh os-name.sh
                     COMMAND ${LISP_IMPL} build.lisp
-                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-add_custom_command (OUTPUT vsanalizer
-                    DEPENDS vsanalizer.bin
-                    COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/vsanalizer.bin vsanalizer
-                    COMMAND rm ${CMAKE_CURRENT_SOURCE_DIR}/os-name.lisp-expr)
+                    DEPENDS ${LISP_SOURCES})
+add_custom_target (analizer ALL
+                  DEPENDS vsanalizer)
 
-#install (PROGRAMS analizer
-#         DESTINATION bin)
+install (PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/vsanalizer
+         DESTINATION bin)

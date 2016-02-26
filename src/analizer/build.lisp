@@ -19,7 +19,7 @@
   (:use :cl :vsanalizer))
 (in-package :vsanalizer-builder)
 
-(defparameter +name+ "vsanalizer.bin")
+(defparameter +name+ "vsanalizer")
 
 (defun get-argv ()
   #+sbcl (cdr sb-ext:*posix-argv*)
