@@ -104,6 +104,18 @@
       (graphviz-report graph)))
   #+clisp (ext:quit 0))
 
+(defun do-test (args)
+  (multiple-value-bind (options optional-parameters parameters)
+      (parse-argv args nil)
+    (if (or (/= (length parameters) 2)
+            optional-parameters options)
+        (print-usage))
+    (let ((graph (call-graph
+                  (first parameters)
+                  (second parameters))))
+      (vsanalizer-test:run-tests graph)))
+  #+clisp (ext:quit 0))
+
 (defun analizer-impl ()
   (let ((command (car (get-argv)))
         (args (cdr (get-argv))))
@@ -114,6 +126,8 @@
        (do-graph-report args))
       ((string= command "histogram")
        (do-histogram-report args))
+      ((string= command "test")
+       (do-test args))
       (t (print-usage)))))
 
 #+sbcl

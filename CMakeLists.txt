@@ -12,4 +12,4 @@ add_subdirectory (tests)
 add_custom_target (check
                   DEPENDS runtime-check
 #                  DEPENDS vsanalizer
-                  COMMAND ./src/analizer/vsanalizer --report test tests/prof1.smpl tests/prof1.map)
+                  COMMAND ./src/analizer/vsanalizer test tests/prof1.smpl tests/prof1.map)

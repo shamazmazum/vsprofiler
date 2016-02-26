@@ -19,7 +19,7 @@
                (mapc #'print-total (cdr node)))))
     (mapc #'print-total graph)))
 
-(defun run-tests (graph &key &allow-other-keys)
+(defun run-tests (graph)
   (test-graph graph)
   (terpri)
   (flat-report graph))
